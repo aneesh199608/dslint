@@ -1,18 +1,10 @@
 {
-  "name": "Compass",
+  "name": "DSLint - Color Token Check",
   "id": "1577348358952883926",
   "api": "1.0.0",
-  "main": "code.js",
-  "capabilities": [],
-  "enableProposedApi": false,
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"],
   "documentAccess": "dynamic-page",
-  "editorType": [
-    "figma"
-  ],
-  "ui": "ui.html",
-  "networkAccess": {
-    "allowedDomains": [
-      "none"
-    ]
-  }
+  "networkAccess": { "allowedDomains": ["none"] }
 }
