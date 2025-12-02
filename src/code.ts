@@ -29,31 +29,87 @@ const rgbDistanceSq = (a: RGB, b: RGB): number => {
   return dr * dr + dg * dg + db * db;
 };
 
-const getDefaultModeColor = (variable: Variable): RGB | null => {
-  if (variable.resolvedType !== "COLOR") return null;
-  const modeId = Object.keys(variable.valuesByMode)[0];
-  if (!modeId) return null;
-  const value = variable.valuesByMode[modeId];
-  if (!value || typeof value !== "object") return null;
-  const maybeColor = value as RGB & { a?: number };
-  if (typeof maybeColor.r !== "number") return null;
-  return { r: maybeColor.r, g: maybeColor.g, b: maybeColor.b };
+const pickModeId = (collection: VariableCollection, preferredModeName: string): string | null => {
+  return (
+    collection.modes.find(
+      (mode) => mode.name.toLowerCase() === preferredModeName.toLowerCase()
+    )?.modeId ??
+    collection.modes.find((mode) => mode.modeId === collection.defaultModeId)?.modeId ??
+    collection.modes[0]?.modeId ??
+    null
+  );
 };
 
-const findNearestColorVariable = async (color: RGB) => {
+const resolveColorForMode = async (
+  variable: Variable,
+  preferredModeName: string
+): Promise<RGB | null> => {
+  if (variable.resolvedType !== "COLOR") return null;
+
+  const resolveValue = async (
+    value: VariableValue,
+    preferredName: string,
+    fallbackModeId: string
+  ): Promise<RGB | null> => {
+    if (typeof value === "object" && "type" in value && value.type === "VARIABLE_ALIAS") {
+      const target = await figma.variables.getVariableByIdAsync(value.id);
+      if (!target) return null;
+      const targetCollection = await figma.variables.getVariableCollectionByIdAsync(
+        target.variableCollectionId
+      );
+      if (!targetCollection) return null;
+      const targetModeId = pickModeId(targetCollection, preferredName) ?? fallbackModeId;
+      const next = target.valuesByMode[targetModeId];
+      return next ? resolveValue(next, preferredName, targetModeId) : null;
+    }
+    const color = value as RGB & { a?: number };
+    if (typeof color.r === "number") {
+      return { r: color.r, g: color.g, b: color.b };
+    }
+    return null;
+  };
+
+  const collection = await figma.variables.getVariableCollectionByIdAsync(
+    variable.variableCollectionId
+  );
+  if (!collection) return null;
+  const modeId = pickModeId(collection, preferredModeName);
+  if (!modeId) return null;
+
+  const modeValue = variable.valuesByMode[modeId];
+  if (!modeValue) return null;
+  return resolveValue(modeValue, preferredModeName, modeId);
+};
+
+const findNearestColorVariable = async (color: RGB, preferredModeName = "Light") => {
   const variables = await figma.variables.getLocalVariablesAsync("COLOR");
-  let nearest: { variable: Variable; distance: number } | null = null;
+  let bestMulti: { variable: Variable; distance: number } | null = null;
+  let bestSingle: { variable: Variable; distance: number } | null = null;
 
   for (const variable of variables) {
-    const variableColor = getDefaultModeColor(variable);
+    const collection = await figma.variables.getVariableCollectionByIdAsync(
+      variable.variableCollectionId
+    );
+    if (!collection) continue;
+
+    const variableColor = await resolveColorForMode(variable, preferredModeName);
     if (!variableColor) continue;
+
     const distance = rgbDistanceSq(color, variableColor);
-    if (!nearest || distance < nearest.distance) {
-      nearest = { variable, distance };
+    const isMultiMode = collection.modes.length > 1;
+
+    if (isMultiMode) {
+      if (!bestMulti || distance < bestMulti.distance) {
+        bestMulti = { variable, distance };
+      }
+    } else {
+      if (!bestSingle || distance < bestSingle.distance) {
+        bestSingle = { variable, distance };
+      }
     }
   }
 
-  return nearest?.variable ?? null;
+  return (bestMulti ?? bestSingle)?.variable ?? null;
 };
 
 const applyNearestTokenToSelection = async () => {
@@ -101,7 +157,7 @@ const applyNearestTokenToSelection = async () => {
     return;
   }
 
-  const nearestVariable = await findNearestColorVariable(firstFill.color);
+  const nearestVariable = await findNearestColorVariable(firstFill.color, "Light");
 
   if (!nearestVariable) {
     sendStatus({
