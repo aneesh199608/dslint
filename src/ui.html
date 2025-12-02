@@ -16,8 +16,13 @@
       }
       .top-bar {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 10px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
       }
       .actions {
         margin-top: 12px;
@@ -48,6 +53,30 @@
       }
       .card.success {
         background: #f0fdf4;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 8px;
+      }
+      .row-apply {
+        border: 1px solid #cbd5e1;
+        background: linear-gradient(#ffffff, #f8fafc);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: #0f172a;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+      .row-apply:hover {
+        background: #eef2ff;
+        border-color: #94a3b8;
       }
       .primary-button {
         border: none;
@@ -81,35 +110,76 @@
   </head>
   <body>
     <div class="top-bar">
-      <button
-        id="refresh"
-        class="icon-button"
-        title="Refresh report"
-        aria-label="Refresh report"
-      >
-        Scan Again
-      </button>
+      <div></div>
+      <div class="actions">
+        <button
+          id="apply-all"
+          class="primary-button"
+          title="Apply nearest color tokens to all"
+          aria-label="Apply nearest color tokens to all"
+        >
+          Apply Token to All
+        </button>
+        <button
+          id="refresh"
+          class="icon-button"
+          title="Refresh report"
+          aria-label="Refresh report"
+        >
+          Scan Again
+        </button>
+      </div>
     </div>
     <div class="card">
       <h2 id="title">Inspecting selection...</h2>
       <p id="message">Select a single rectangle to inspect.</p>
-      <div class="actions">
-        <button
-          id="apply"
-          class="primary-button"
-          title="Apply nearest color token"
-          aria-label="Apply nearest color token"
-        >
-          Apply Token
-        </button>
-      </div>
     </div>
+    <div id="list"></div>
     <script>
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
       const refreshBtn = document.getElementById("refresh");
-      const applyBtn = document.getElementById("apply");
+      const applyAllBtn = document.getElementById("apply-all");
       const cardEl = document.querySelector(".card");
+      const listEl = document.getElementById("list");
+
+      const renderList = (items) => {
+        if (!listEl) return;
+        if (!items || items.length === 0) {
+          listEl.innerHTML = `<p style="color:#94a3b8;font-size:12px;margin-top:12px;">No nodes with fills found in selection.</p>`;
+          return;
+        }
+
+        const rows = items
+          .map((item) => {
+            const statusColor =
+              item.state === "found" || item.state === "applied"
+                ? "#16a34a"
+                : item.state === "error"
+                ? "#b91c1c"
+                : "#475569";
+            const button =
+              item.state === "missing"
+                ? `<button data-id="${item.id}" class="row-apply">Apply Token</button>`
+                : "";
+            return `<div class="row">
+              <div>
+                <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
+                <div style="font-size:12px;color:${statusColor};">${item.message}</div>
+              </div>
+              ${button}
+            </div>`;
+          })
+          .join("");
+        listEl.innerHTML = rows;
+
+        listEl.querySelectorAll(".row-apply").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-id");
+            parent.postMessage({ pluginMessage: { type: "apply-token", nodeId: id } }, "*");
+          });
+        });
+      };
 
       window.onmessage = (event) => {
         const data = event.data.pluginMessage;
@@ -121,17 +191,23 @@
           "success",
           state === "found" || state === "applied"
         );
-        if (applyBtn) {
-          applyBtn.hidden = state !== "missing";
-        }
       };
+
+      window.addEventListener("message", (event) => {
+        const data = event.data.pluginMessage;
+        if (!data) return;
+        if (data.type === "status") return; // handled above
+        if (data.type === "scan-results") {
+          renderList(data.payload.items || []);
+        }
+      });
 
       refreshBtn?.addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
       });
 
-      applyBtn?.addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "apply-token" } }, "*");
+      applyAllBtn?.addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "apply-token-all" } }, "*");
       });
     </script>
   </body>

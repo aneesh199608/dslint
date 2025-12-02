@@ -122,24 +122,140 @@ const findNearestColorVariable = async (color: RGB, preferredModeName = "Light")
   return (bestMulti ?? bestSingle)?.variable ?? null;
 };
 
-const applyNearestTokenToSelection = async () => {
+type NodeScanResult = {
+  id: string;
+  name: string;
+  message: string;
+  state: StatusState;
+  hex?: string;
+  variableName?: string;
+};
+
+const evalNodeFill = async (node: SceneNode): Promise<NodeScanResult | null> => {
+  if (!("fills" in node)) return null;
+
+  const fills = node.fills;
+
+  if (fills === figma.mixed || fills.length === 0) {
+    return {
+      id: node.id,
+      name: node.name,
+      message: "No fill detected",
+      state: "info",
+    };
+  }
+
+  const firstFill = fills[0];
+
+  if (firstFill.type !== "SOLID") {
+    return {
+      id: node.id,
+      name: node.name,
+      message: "Unsupported fill type (only SOLID supported)",
+      state: "error",
+    };
+  }
+
+  const bound = firstFill.boundVariables?.color;
+  const boundId = typeof bound === "string" ? bound : bound?.id;
+
+  if (boundId) {
+    const variable = await figma.variables.getVariableByIdAsync(boundId);
+    const variableName = variable?.name ?? "Color variable";
+
+    return {
+      id: node.id,
+      name: node.name,
+      message: `Using variable: ${variableName}`,
+      state: "found",
+      variableName,
+    };
+  }
+
+  const hex = rgbToHex(firstFill.color);
+
+  return {
+    id: node.id,
+    name: node.name,
+    message: `Fill color: ${hex} is not using a variable.`,
+    state: "missing",
+    hex,
+  };
+};
+
+const gatherNodesWithFills = (nodes: readonly SceneNode[]): SceneNode[] => {
+  const result: SceneNode[] = [];
+
+  const walk = (node: SceneNode) => {
+    if ("fills" in node) {
+      result.push(node);
+    }
+    if ("children" in node) {
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+  };
+
+  for (const node of nodes) {
+    walk(node);
+  }
+
+  return result;
+};
+
+const scanSelection = async () => {
   const selection = figma.currentPage.selection;
 
-  if (selection.length !== 1) {
+  if (selection.length === 0) {
     sendStatus({
       title: "Select a layer or frame to inspect.",
-      message: "Choose a single node with a fill to apply a token.",
+      message: "Choose a single node or frame to scan for color tokens.",
+      state: "info",
+    });
+    figma.ui.postMessage({ type: "scan-results", payload: { items: [] } });
+    return;
+  }
+
+  const nodes = gatherNodesWithFills(selection);
+  const results: NodeScanResult[] = [];
+
+  for (const node of nodes) {
+    const res = await evalNodeFill(node);
+    if (res) results.push(res);
+  }
+
+  const found = results.filter((r) => r.state === "found").length;
+  const missing = results.filter((r) => r.state === "missing").length;
+  const errors = results.filter((r) => r.state === "error").length;
+
+  const title = "Scan complete";
+  const message = `${found} with tokens, ${missing} missing, ${errors} unsupported`;
+
+  sendStatus({ title, message, state: "info" });
+  figma.ui.postMessage({
+    type: "scan-results",
+    payload: {
+      items: results,
+    },
+  });
+};
+
+const applyNearestTokenToNode = async (nodeId: string) => {
+  const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+  if (!node) {
+    sendStatus({
+      title: "Apply failed",
+      message: "Node not found.",
       state: "error",
     });
     return;
   }
 
-  const node = selection[0];
-
   if (!("fills" in node)) {
     sendStatus({
       title: "Unsupported selection",
-      message: "Select a rectangle or any node that supports fills.",
+      message: "Select a node that supports fills.",
       state: "error",
     });
     return;
@@ -187,93 +303,41 @@ const applyNearestTokenToSelection = async () => {
   };
 
   node.fills = [updatedFill];
-
-  sendStatus({
-    title: "Color token applied",
-    message: `Applied token: ${nearestVariable.name}`,
-    state: "applied",
-  });
 };
 
-const inspectSelection = async () => {
+const applyAllMissing = async () => {
   const selection = figma.currentPage.selection;
-
-  if (selection.length !== 1) {
+  if (selection.length === 0) {
     sendStatus({
       title: "Select a layer or frame to inspect.",
-      message: "Choose a single node with a fill to check for color tokens.",
+      message: "Choose a node to scan and apply tokens.",
       state: "info",
     });
     return;
   }
 
-  const node = selection[0];
-
-  if (!("fills" in node)) {
-    sendStatus({
-      title: "Unsupported selection",
-      message: "Select a rectangle or any node that supports fills.",
-      state: "error",
-    });
-    return;
+  const nodes = gatherNodesWithFills(selection);
+  for (const node of nodes) {
+    const res = await evalNodeFill(node);
+    if (res?.state === "missing") {
+      await applyNearestTokenToNode(node.id);
+    }
   }
 
-  const fills = node.fills;
-
-  if (fills === figma.mixed || fills.length === 0) {
-    sendStatus({
-      title: "No fill detected",
-      message: "Add a solid fill to check for a color token.",
-      state: "info",
-    });
-    return;
-  }
-
-  const firstFill = fills[0];
-
-  if (firstFill.type !== "SOLID") {
-    sendStatus({
-      title: "Unsupported fill type",
-      message: "Only solid fills are supported for this check.",
-      state: "error",
-    });
-    return;
-  }
-
-  const bound = firstFill.boundVariables?.color;
-  const boundId = typeof bound === "string" ? bound : bound?.id;
-
-  if (boundId) {
-    const variable = await figma.variables.getVariableByIdAsync(boundId);
-    const variableName = variable?.name ?? "Color variable";
-
-    sendStatus({
-      title: "Color token found",
-      message: `Using variable: ${variableName}`,
-      state: "found",
-    });
-    return;
-  }
-
-  const hex = rgbToHex(firstFill.color);
-
-  sendStatus({
-    title: "Missing color token?",
-    message: `Fill color: ${hex} is not using a variable.`,
-    state: "missing",
-  });
+  await scanSelection();
 };
 
-inspectSelection();
+scanSelection();
 
 figma.ui.onmessage = async (msg) => {
   if (msg?.type === "refresh") {
-    await inspectSelection();
+    await scanSelection();
   }
 
   if (msg?.type === "apply-token") {
     try {
-      await applyNearestTokenToSelection();
+      await applyNearestTokenToNode(msg.nodeId);
+      await scanSelection();
     } catch (error) {
       sendStatus({
         title: "Apply failed",
@@ -281,6 +345,19 @@ figma.ui.onmessage = async (msg) => {
         state: "error",
       });
       console.error("Apply token error", error);
+    }
+  }
+
+  if (msg?.type === "apply-token-all") {
+    try {
+      await applyAllMissing();
+    } catch (error) {
+      sendStatus({
+        title: "Apply failed",
+        message: "Could not apply tokens to all nodes. Try refreshing.",
+        state: "error",
+      });
+      console.error("Apply token all error", error);
     }
   }
 };
