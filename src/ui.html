@@ -19,6 +19,9 @@
         justify-content: flex-end;
         margin-bottom: 10px;
       }
+      .actions {
+        margin-top: 12px;
+      }
       .icon-button {
         border: 1px solid #cbd5e1;
         background: linear-gradient(#ffffff, #f8fafc);
@@ -46,6 +49,25 @@
       .card.success {
         background: #f0fdf4;
       }
+      .primary-button {
+        border: none;
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: white;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        box-shadow: 0 6px 12px rgba(99, 102, 241, 0.2);
+        transition: transform 120ms ease, box-shadow 120ms ease;
+      }
+      .primary-button:hover {
+        box-shadow: 0 8px 16px rgba(99, 102, 241, 0.25);
+        transform: translateY(-1px);
+      }
+      .primary-button:active {
+        transform: translateY(0);
+        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+      }
       h2 {
         margin: 0 0 6px;
         font-size: 16px;
@@ -71,24 +93,45 @@
     <div class="card">
       <h2 id="title">Inspecting selection...</h2>
       <p id="message">Select a single rectangle to inspect.</p>
+      <div class="actions">
+        <button
+          id="apply"
+          class="primary-button"
+          title="Apply nearest color token"
+          aria-label="Apply nearest color token"
+        >
+          Apply Token
+        </button>
+      </div>
     </div>
     <script>
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
       const refreshBtn = document.getElementById("refresh");
+      const applyBtn = document.getElementById("apply");
       const cardEl = document.querySelector(".card");
 
       window.onmessage = (event) => {
         const data = event.data.pluginMessage;
         if (!data || data.type !== "status") return;
-        const { title, message } = data.payload;
+        const { title, message, state } = data.payload;
         titleEl.textContent = title;
         messageEl.textContent = message;
-        cardEl?.classList.toggle("success", title === "Color token found");
+        cardEl?.classList.toggle(
+          "success",
+          state === "found" || state === "applied"
+        );
+        if (applyBtn) {
+          applyBtn.hidden = state !== "missing";
+        }
       };
 
       refreshBtn?.addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
+      });
+
+      applyBtn?.addEventListener("click", () => {
+        parent.postMessage({ pluginMessage: { type: "apply-token" } }, "*");
       });
     </script>
   </body>
