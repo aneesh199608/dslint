@@ -84,6 +84,12 @@ const inspectSelection = async () => {
 
 inspectSelection();
 
+figma.ui.onmessage = async (msg) => {
+  if (msg?.type === "refresh") {
+    await inspectSelection();
+  }
+};
+
 // TODO: Support strokes alongside fills.
 // TODO: Handle multiple fills and pick the visible one.
 // TODO: Add bulk scanning for multiple selections or pages.
