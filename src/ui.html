@@ -43,6 +43,9 @@
         padding: 14px;
         box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
       }
+      .card.success {
+        background: #f0fdf4;
+      }
       h2 {
         margin: 0 0 6px;
         font-size: 16px;
@@ -73,6 +76,7 @@
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
       const refreshBtn = document.getElementById("refresh");
+      const cardEl = document.querySelector(".card");
 
       window.onmessage = (event) => {
         const data = event.data.pluginMessage;
@@ -80,6 +84,7 @@
         const { title, message } = data.payload;
         titleEl.textContent = title;
         messageEl.textContent = message;
+        cardEl?.classList.toggle("success", title === "Color token found");
       };
 
       refreshBtn?.addEventListener("click", () => {
