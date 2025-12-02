@@ -63,10 +63,7 @@ const resolveColorForMode = async (
       return next ? resolveValue(next, preferredName, targetModeId) : null;
     }
     const color = value as RGB & { a?: number };
-    if (typeof color.r === "number") {
-      return { r: color.r, g: color.g, b: color.b };
-    }
-    return null;
+    return typeof color.r === "number" ? { r: color.r, g: color.g, b: color.b } : null;
   };
 
   const collection = await figma.variables.getVariableCollectionByIdAsync(
@@ -81,8 +78,14 @@ const resolveColorForMode = async (
   return resolveValue(modeValue, preferredModeName, modeId);
 };
 
+const colorsEqual = (a: RGB, b: RGB) => {
+  const eps = 1e-5;
+  return Math.abs(a.r - b.r) < eps && Math.abs(a.g - b.g) < eps && Math.abs(a.b - b.b) < eps;
+};
+
 const findNearestColorVariable = async (color: RGB, preferredModeName = "Light") => {
   const variables = await figma.variables.getLocalVariablesAsync("COLOR");
+  const exactMatches: { variable: Variable; isMulti: boolean }[] = [];
   let bestMulti: { variable: Variable; distance: number } | null = null;
   let bestSingle: { variable: Variable; distance: number } | null = null;
 
@@ -95,18 +98,25 @@ const findNearestColorVariable = async (color: RGB, preferredModeName = "Light")
     const variableColor = await resolveColorForMode(variable, preferredModeName);
     if (!variableColor) continue;
 
-    const distance = rgbDistanceSq(color, variableColor);
     const isMultiMode = collection.modes.length > 1;
 
-    if (isMultiMode) {
-      if (!bestMulti || distance < bestMulti.distance) {
-        bestMulti = { variable, distance };
-      }
-    } else {
-      if (!bestSingle || distance < bestSingle.distance) {
-        bestSingle = { variable, distance };
-      }
+    if (colorsEqual(variableColor, color)) {
+      exactMatches.push({ variable, isMulti: isMultiMode });
+      continue;
     }
+
+    const distance = rgbDistanceSq(color, variableColor);
+    if (isMultiMode) {
+      if (!bestMulti || distance < bestMulti.distance) bestMulti = { variable, distance };
+    } else {
+      if (!bestSingle || distance < bestSingle.distance) bestSingle = { variable, distance };
+    }
+  }
+
+  if (exactMatches.length === 1) return exactMatches[0].variable;
+  if (exactMatches.length > 1) {
+    const multi = exactMatches.find((m) => m.isMulti);
+    return (multi ?? exactMatches[0]).variable;
   }
 
   return (bestMulti ?? bestSingle)?.variable ?? null;
