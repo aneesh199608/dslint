@@ -1,38 +1,31 @@
 import { rgbToHex } from "./colors";
 import { sendStatus } from "./messages";
-import { gatherNodesWithFills } from "./selection";
+import { gatherNodesWithPaints } from "./selection";
 import { setOriginalSelection } from "./highlight";
-import type { ModePreference, NodeScanResult } from "./types";
+import type { ModePreference, NodeScanResult, PaintInfo, StatusState } from "./types";
 
-export const evalNodeFill = async (
+const evalPaint = async (
   node: SceneNode,
+  kind: "fill" | "stroke",
   preferredModeName: ModePreference
-): Promise<NodeScanResult | null> => {
-  if (!("fills" in node)) return null;
-
-  const fills = node.fills;
-
-  if (fills === figma.mixed || fills.length === 0) {
-    return {
-      id: node.id,
-      name: node.name,
-      message: "No fill detected",
-      state: "info",
-    };
+): Promise<PaintInfo | null> => {
+  const paints = kind === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
+  if (!paints) return null;
+  if (paints === figma.mixed || paints.length === 0) {
+    return null;
   }
 
-  const firstFill = fills[0];
+  const first = paints[0];
 
-  if (firstFill.type !== "SOLID") {
+  if (first.type !== "SOLID") {
     return {
-      id: node.id,
-      name: node.name,
-      message: "Unsupported fill type (only SOLID supported)",
+      kind,
+      message: `Unsupported ${kind} type (only SOLID supported)`,
       state: "error",
     };
   }
 
-  const bound = firstFill.boundVariables?.color;
+  const bound = first.boundVariables?.color;
   const boundId = typeof bound === "string" ? bound : bound?.id;
 
   if (boundId) {
@@ -40,23 +33,29 @@ export const evalNodeFill = async (
     const variableName = variable?.name ?? "Color variable";
 
     return {
-      id: node.id,
-      name: node.name,
+      kind,
       message: `Using variable: ${variableName}`,
       state: "found",
       variableName,
     };
   }
 
-  const hex = rgbToHex(firstFill.color);
+  const hex = rgbToHex(first.color);
 
   return {
-    id: node.id,
-    name: node.name,
-    message: `Fill color: ${hex} is not using a variable.`,
+    kind,
+    message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex} is not using a variable.`,
     state: "missing",
     hex,
   };
+};
+
+const computeOverallState = (fill?: PaintInfo | null, stroke?: PaintInfo | null): StatusState => {
+  const parts = [fill, stroke].filter(Boolean) as PaintInfo[];
+  if (parts.some((p) => p.state === "missing")) return "missing";
+  if (parts.some((p) => p.state === "error")) return "error";
+  if (parts.some((p) => p.state === "found" || p.state === "applied")) return "found";
+  return "info";
 };
 
 export const scanSelection = async (preferredModeName: ModePreference): Promise<NodeScanResult[]> => {
@@ -73,12 +72,23 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     return [];
   }
 
-  const nodes = gatherNodesWithFills(selection);
+  const nodes = gatherNodesWithPaints(selection);
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
-    const res = await evalNodeFill(node, preferredModeName);
-    if (res) results.push(res);
+    const fill = await evalPaint(node, "fill", preferredModeName);
+    const stroke = await evalPaint(node, "stroke", preferredModeName);
+    if (!fill && !stroke) continue;
+
+    const state = computeOverallState(fill, stroke);
+
+    results.push({
+      id: node.id,
+      name: node.name,
+      state,
+      fill: fill || undefined,
+      stroke: stroke || undefined,
+    });
   }
 
   const found = results.filter((r) => r.state === "found").length;

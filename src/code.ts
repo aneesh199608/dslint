@@ -27,7 +27,7 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token") {
     try {
-      await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode));
+      await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
       await handleScan(msg.mode);
     } catch (error) {
       sendStatus({

@@ -8,11 +8,18 @@ export type StatusPayload = {
   state?: StatusState;
 };
 
-export type NodeScanResult = {
-  id: string;
-  name: string;
+export type PaintInfo = {
+  kind: "fill" | "stroke";
   message: string;
   state: StatusState;
   hex?: string;
   variableName?: string;
+};
+
+export type NodeScanResult = {
+  id: string;
+  name: string;
+  state: StatusState;
+  fill?: PaintInfo;
+  stroke?: PaintInfo;
 };

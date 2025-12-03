@@ -1,8 +1,8 @@
-export const gatherNodesWithFills = (nodes: readonly SceneNode[]): SceneNode[] => {
+export const gatherNodesWithPaints = (nodes: readonly SceneNode[]): SceneNode[] => {
   const result: SceneNode[] = [];
 
   const walk = (node: SceneNode) => {
-    if ("fills" in node) {
+    if ("fills" in node || "strokes" in node) {
       result.push(node);
     }
     if ("children" in node) {

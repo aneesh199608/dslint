@@ -1,12 +1,13 @@
 import { sendStatus } from "./messages";
 import { findNearestColorVariable } from "./variables";
-import { evalNodeFill } from "./scanner";
-import { gatherNodesWithFills } from "./selection";
+import { scanSelection } from "./scanner";
 import type { ModePreference } from "./types";
+import type { SolidPaint } from "@figma/plugin-typings";
 
 export const applyNearestTokenToNode = async (
   nodeId: string,
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  target: "fill" | "stroke" = "fill"
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node) {
@@ -18,38 +19,38 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
-  if (!("fills" in node)) {
+  const paints = target === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
+
+  if (!paints) {
     sendStatus({
       title: "Unsupported selection",
-      message: "Select a node that supports fills.",
+      message: `Select a node that supports ${target}s.`,
       state: "error",
     });
     return;
   }
 
-  const fills = node.fills;
-
-  if (fills === figma.mixed || fills.length === 0) {
+  if (paints === figma.mixed || paints.length === 0) {
     sendStatus({
-      title: "No fill detected",
-      message: "Add a solid fill to apply a color token.",
+      title: `No ${target} detected`,
+      message: `Add a solid ${target} to apply a color token.`,
       state: "error",
     });
     return;
   }
 
-  const firstFill = fills[0];
+  const first = paints[0];
 
-  if (firstFill.type !== "SOLID") {
+  if (first.type !== "SOLID") {
     sendStatus({
-      title: "Unsupported fill type",
-      message: "Only solid fills are supported for applying a token.",
+      title: "Unsupported paint type",
+      message: "Only solid paints are supported for applying a token.",
       state: "error",
     });
     return;
   }
 
-  const nearestVariable = await findNearestColorVariable(firstFill.color, preferredModeName);
+  const nearestVariable = await findNearestColorVariable(first.color, preferredModeName);
 
   if (!nearestVariable) {
     sendStatus({
@@ -60,33 +61,33 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
-  const updatedFill: SolidPaint = {
-    ...firstFill,
+  const updatedPaint: SolidPaint = {
+    ...first,
     boundVariables: {
-      ...(firstFill.boundVariables ?? {}),
+      ...(first.boundVariables ?? {}),
       color: { id: nearestVariable.id, type: "VARIABLE_ALIAS" },
     },
   };
 
-  node.fills = [updatedFill];
+  if (target === "fill") {
+    (node as GeometryMixin).fills = [updatedPaint];
+  } else {
+    (node as GeometryMixin).strokes = [updatedPaint];
+  }
 };
 
 export const applyAllMissing = async (preferredModeName: ModePreference) => {
-  const selection = figma.currentPage.selection;
-  if (selection.length === 0) {
-    sendStatus({
-      title: "Select a layer or frame to inspect.",
-      message: "Choose a node to scan and apply tokens.",
-      state: "info",
-    });
-    return;
-  }
+  const results = await scanSelection(preferredModeName);
+  if (!results.length) return;
 
-  const nodes = gatherNodesWithFills(selection);
-  for (const node of nodes) {
-    const res = await evalNodeFill(node, preferredModeName);
-    if (res?.state === "missing") {
-      await applyNearestTokenToNode(node.id, preferredModeName);
+  for (const item of results) {
+    if (item.fill?.state === "missing") {
+      await applyNearestTokenToNode(item.id, preferredModeName, "fill");
+    }
+    if (item.stroke?.state === "missing") {
+      await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
     }
   }
+
+  await scanSelection(preferredModeName);
 };

@@ -210,16 +210,30 @@
                 <line x1="18" y1="12" x2="22" y2="12"/>
               </svg>
             </button>`;
-            const button =
-              item.state === "missing"
-                ? `<div style="display:flex;align-items:center;gap:6px;">${highlight}<button data-id="${item.id}" class="row-apply">Apply Token</button></div>`
-                : `<div style="display:flex;align-items:center;gap:6px;">${highlight}</div>`;
+            const fillStatus = item.fill
+              ? `<div style="font-size:12px;color:${item.fill.state === "missing" ? "#b91c1c" : statusColor};">Fill: ${item.fill.message}</div>`
+              : "";
+            const strokeStatus = item.stroke
+              ? `<div style="font-size:12px;color:${item.stroke.state === "missing" ? "#b91c1c" : statusColor};">Stroke: ${item.stroke.message}</div>`
+              : "";
+
+            const fillBtn =
+              item.fill?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="fill" class="row-apply">Apply Fill Token</button>`
+                : "";
+            const strokeBtn =
+              item.stroke?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="stroke" class="row-apply">Apply Stroke Token</button>`
+                : "";
+
+            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
-                <div style="font-size:12px;color:${statusColor};">${item.message}</div>
+                ${fillStatus || ""}
+                ${strokeStatus || ""}
               </div>
-              ${button}
+              ${buttons}
             </div>`;
           })
           .join("");
@@ -228,8 +242,9 @@
         listEl.querySelectorAll(".row-apply").forEach((btn) => {
           btn.addEventListener("click", () => {
             const id = btn.getAttribute("data-id");
+            const target = btn.getAttribute("data-target") || "fill";
             parent.postMessage(
-              { pluginMessage: { type: "apply-token", nodeId: id, mode: getMode() } },
+              { pluginMessage: { type: "apply-token", nodeId: id, target, mode: getMode() } },
               "*"
             );
           });
