@@ -78,6 +78,21 @@
         background: #eef2ff;
         border-color: #94a3b8;
       }
+      .row-highlight {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 6px;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .row-highlight:hover {
+        background: #eef2ff;
+        border-color: #94a3b8;
+      }
       .primary-button {
         border: none;
         background: linear-gradient(135deg, #4f46e5, #6366f1);
@@ -186,10 +201,19 @@
                 : item.state === "error"
                 ? "#b91c1c"
                 : "#475569";
+            const highlight = `<button data-id="${item.id}" class="row-highlight" title="Highlight in canvas">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3.5"/>
+                <line x1="12" y1="2" x2="12" y2="6"/>
+                <line x1="12" y1="18" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="22" y2="12"/>
+              </svg>
+            </button>`;
             const button =
               item.state === "missing"
-                ? `<button data-id="${item.id}" class="row-apply">Apply Token</button>`
-                : "";
+                ? `<div style="display:flex;align-items:center;gap:6px;">${highlight}<button data-id="${item.id}" class="row-apply">Apply Token</button></div>`
+                : `<div style="display:flex;align-items:center;gap:6px;">${highlight}</div>`;
             return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
@@ -211,17 +235,16 @@
           });
         });
 
-        listEl.querySelectorAll(".row").forEach((row) => {
-          row.addEventListener("mouseenter", () => {
-            const id = row.querySelector(".row-apply")?.getAttribute("data-id") ??
-              row.getAttribute("data-id");
+        listEl.querySelectorAll(".row-highlight").forEach((btn) => {
+          btn.addEventListener("mouseenter", () => {
+            const id = btn.getAttribute("data-id");
             if (!id) return;
             parent.postMessage(
               { pluginMessage: { type: "highlight", nodeId: id, mode: getMode() } },
               "*"
             );
           });
-          row.addEventListener("mouseleave", () => {
+          btn.addEventListener("mouseleave", () => {
             parent.postMessage({ pluginMessage: { type: "highlight-clear" } }, "*");
           });
         });
