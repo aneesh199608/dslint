@@ -112,6 +112,10 @@
     <div class="top-bar">
       <div></div>
       <div class="actions">
+        <select id="filter" class="icon-button" title="Filter results">
+          <option value="missing">Missing only</option>
+          <option value="all">All</option>
+        </select>
         <select id="theme" class="icon-button" title="Preferred mode">
           <option value="Light">Light</option>
           <option value="Dark">Dark</option>
@@ -148,6 +152,7 @@
       const refreshBtn = document.getElementById("refresh");
       const applyAllBtn = document.getElementById("apply-all");
       const themeSelect = document.getElementById("theme");
+      const filterSelect = document.getElementById("filter");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
@@ -170,7 +175,10 @@
           return;
         }
 
-        const rows = items
+        const activeFilter = filterSelect?.value === "all" ? "all" : "missing";
+        const filtered = activeFilter === "missing" ? items.filter((i) => i.state === "missing") : items;
+
+        const rows = filtered
           .map((item) => {
             const statusColor =
               item.state === "found" || item.state === "applied"
@@ -250,6 +258,11 @@
 
       themeSelect?.addEventListener("change", () => {
         updateDarkNote();
+      });
+
+      filterSelect?.addEventListener("change", () => {
+        // Re-render with the current cached list; easiest is to trigger a refresh.
+        parent.postMessage({ pluginMessage: { type: "refresh", mode: getMode() } }, "*");
       });
 
       updateDarkNote();
