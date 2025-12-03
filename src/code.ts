@@ -6,7 +6,10 @@ type StatusPayload = {
   state?: StatusState;
 };
 
-figma.showUI(__html__, { width: 360, height: 200 });
+const MIN_WIDTH = 480;
+const MIN_HEIGHT = 720;
+
+figma.showUI(__html__, { width: MIN_WIDTH, height: MIN_HEIGHT });
 
 const toHex = (value: number): string => {
   const hex = Math.round(value * 255)
@@ -359,6 +362,12 @@ figma.ui.onmessage = async (msg) => {
       });
       console.error("Apply token all error", error);
     }
+  }
+
+  if (msg?.type === "ui-resized") {
+    const width = Math.max(MIN_WIDTH, Number(msg.width) || MIN_WIDTH);
+    const height = Math.max(MIN_HEIGHT, Number(msg.height) || MIN_HEIGHT);
+    figma.ui.resize(width, height);
   }
 };
 

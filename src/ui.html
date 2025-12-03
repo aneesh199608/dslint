@@ -209,6 +209,20 @@
       applyAllBtn?.addEventListener("click", () => {
         parent.postMessage({ pluginMessage: { type: "apply-token-all" } }, "*");
       });
+
+      const sendSize = () => {
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "ui-resized",
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+          },
+          "*"
+        );
+      };
+      window.addEventListener("resize", sendSize);
     </script>
   </body>
 </html>
