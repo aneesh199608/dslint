@@ -45,7 +45,7 @@ const pickModeId = (collection: VariableCollection, preferredModeName: string): 
 
 const resolveColorForMode = async (
   variable: Variable,
-  preferredModeName: string
+  preferredModeName: "Light" | "Dark"
 ): Promise<RGB | null> => {
   if (variable.resolvedType !== "COLOR") return null;
 
@@ -86,7 +86,7 @@ const colorsEqual = (a: RGB, b: RGB) => {
   return Math.abs(a.r - b.r) < eps && Math.abs(a.g - b.g) < eps && Math.abs(a.b - b.b) < eps;
 };
 
-const findNearestColorVariable = async (color: RGB, preferredModeName = "Light") => {
+const findNearestColorVariable = async (color: RGB, preferredModeName: "Light" | "Dark") => {
   const variables = await figma.variables.getLocalVariablesAsync("COLOR");
   const exactMatches: { variable: Variable; isMulti: boolean }[] = [];
   let bestMulti: { variable: Variable; distance: number } | null = null;
@@ -134,7 +134,10 @@ type NodeScanResult = {
   variableName?: string;
 };
 
-const evalNodeFill = async (node: SceneNode): Promise<NodeScanResult | null> => {
+const evalNodeFill = async (
+  node: SceneNode,
+  preferredModeName: "Light" | "Dark"
+): Promise<NodeScanResult | null> => {
   if (!("fills" in node)) return null;
 
   const fills = node.fills;
@@ -207,7 +210,7 @@ const gatherNodesWithFills = (nodes: readonly SceneNode[]): SceneNode[] => {
   return result;
 };
 
-const scanSelection = async () => {
+const scanSelection = async (preferredModeName: "Light" | "Dark" = "Light") => {
   const selection = figma.currentPage.selection;
 
   if (selection.length === 0) {
@@ -224,7 +227,7 @@ const scanSelection = async () => {
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
-    const res = await evalNodeFill(node);
+    const res = await evalNodeFill(node, preferredModeName);
     if (res) results.push(res);
   }
 
@@ -240,11 +243,12 @@ const scanSelection = async () => {
     type: "scan-results",
     payload: {
       items: results,
+      mode: preferredModeName,
     },
   });
 };
 
-const applyNearestTokenToNode = async (nodeId: string) => {
+const applyNearestTokenToNode = async (nodeId: string, preferredModeName: "Light" | "Dark") => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node) {
     sendStatus({
@@ -286,7 +290,7 @@ const applyNearestTokenToNode = async (nodeId: string) => {
     return;
   }
 
-  const nearestVariable = await findNearestColorVariable(firstFill.color, "Light");
+  const nearestVariable = await findNearestColorVariable(firstFill.color, preferredModeName);
 
   if (!nearestVariable) {
     sendStatus({
@@ -308,7 +312,7 @@ const applyNearestTokenToNode = async (nodeId: string) => {
   node.fills = [updatedFill];
 };
 
-const applyAllMissing = async () => {
+const applyAllMissing = async (preferredModeName: "Light" | "Dark") => {
   const selection = figma.currentPage.selection;
   if (selection.length === 0) {
     sendStatus({
@@ -321,26 +325,26 @@ const applyAllMissing = async () => {
 
   const nodes = gatherNodesWithFills(selection);
   for (const node of nodes) {
-    const res = await evalNodeFill(node);
+    const res = await evalNodeFill(node, preferredModeName);
     if (res?.state === "missing") {
-      await applyNearestTokenToNode(node.id);
+      await applyNearestTokenToNode(node.id, preferredModeName);
     }
   }
 
-  await scanSelection();
+  await scanSelection(preferredModeName);
 };
 
-scanSelection();
+scanSelection("Light");
 
 figma.ui.onmessage = async (msg) => {
   if (msg?.type === "refresh") {
-    await scanSelection();
+    await scanSelection(msg.mode ?? "Light");
   }
 
   if (msg?.type === "apply-token") {
     try {
-      await applyNearestTokenToNode(msg.nodeId);
-      await scanSelection();
+      await applyNearestTokenToNode(msg.nodeId, msg.mode ?? "Light");
+      await scanSelection(msg.mode ?? "Light");
     } catch (error) {
       sendStatus({
         title: "Apply failed",
@@ -353,7 +357,7 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token-all") {
     try {
-      await applyAllMissing();
+      await applyAllMissing(msg.mode ?? "Light");
     } catch (error) {
       sendStatus({
         title: "Apply failed",

@@ -112,6 +112,10 @@
     <div class="top-bar">
       <div></div>
       <div class="actions">
+        <select id="theme" class="icon-button" title="Preferred mode">
+          <option value="Light">Light</option>
+          <option value="Dark">Dark</option>
+        </select>
         <button
           id="apply-all"
           class="primary-button"
@@ -134,14 +138,30 @@
       <h2 id="title">Inspecting selection...</h2>
       <p id="message">Select a single rectangle to inspect.</p>
     </div>
+    <p id="dark-note" style="display:none;font-size:12px;color:#475569;margin:8px 0 0;">
+      Using Dark mode—remember to set Figma's Appearance to Dark so tokens resolve correctly.
+    </p>
     <div id="list"></div>
     <script>
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
       const refreshBtn = document.getElementById("refresh");
       const applyAllBtn = document.getElementById("apply-all");
+      const themeSelect = document.getElementById("theme");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
+      const darkNote = document.getElementById("dark-note");
+
+      const getMode = () => {
+        const val = themeSelect?.value === "Dark" ? "Dark" : "Light";
+        return val;
+      };
+
+      const updateDarkNote = () => {
+        if (!darkNote) return;
+        const isDark = getMode() === "Dark";
+        darkNote.style.display = isDark ? "block" : "none";
+      };
 
       const renderList = (items) => {
         if (!listEl) return;
@@ -176,7 +196,10 @@
         listEl.querySelectorAll(".row-apply").forEach((btn) => {
           btn.addEventListener("click", () => {
             const id = btn.getAttribute("data-id");
-            parent.postMessage({ pluginMessage: { type: "apply-token", nodeId: id } }, "*");
+            parent.postMessage(
+              { pluginMessage: { type: "apply-token", nodeId: id, mode: getMode() } },
+              "*"
+            );
           });
         });
       };
@@ -203,12 +226,21 @@
       });
 
       refreshBtn?.addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "refresh" } }, "*");
+        parent.postMessage({ pluginMessage: { type: "refresh", mode: getMode() } }, "*");
       });
 
       applyAllBtn?.addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "apply-token-all" } }, "*");
+        parent.postMessage(
+          { pluginMessage: { type: "apply-token-all", mode: getMode() } },
+          "*"
+        );
       });
+
+      themeSelect?.addEventListener("change", () => {
+        updateDarkNote();
+      });
+
+      updateDarkNote();
 
       const sendSize = () => {
         parent.postMessage(
