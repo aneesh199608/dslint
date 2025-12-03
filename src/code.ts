@@ -9,6 +9,8 @@ type StatusPayload = {
 const MIN_WIDTH = 480;
 const MIN_HEIGHT = 720;
 
+let originalSelectionIds: string[] = [];
+
 figma.showUI(__html__, { width: MIN_WIDTH, height: MIN_HEIGHT });
 
 const toHex = (value: number): string => {
@@ -212,6 +214,7 @@ const gatherNodesWithFills = (nodes: readonly SceneNode[]): SceneNode[] => {
 
 const scanSelection = async (preferredModeName: "Light" | "Dark" = "Light") => {
   const selection = figma.currentPage.selection;
+  originalSelectionIds = selection.map((n) => n.id);
 
   if (selection.length === 0) {
     sendStatus({
@@ -382,6 +385,19 @@ figma.ui.onmessage = async (msg) => {
       }
     } catch (error) {
       console.error("Highlight error", error);
+    }
+  }
+
+  if (msg?.type === "highlight-clear") {
+    try {
+      const restored: SceneNode[] = [];
+      for (const id of originalSelectionIds) {
+        const n = (await figma.getNodeByIdAsync(id)) as SceneNode | null;
+        if (n) restored.push(n);
+      }
+      figma.currentPage.selection = restored;
+    } catch (error) {
+      console.error("Highlight clear error", error);
     }
   }
 };

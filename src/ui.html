@@ -221,6 +221,9 @@
               "*"
             );
           });
+          row.addEventListener("mouseleave", () => {
+            parent.postMessage({ pluginMessage: { type: "highlight-clear" } }, "*");
+          });
         });
       };
 
