@@ -182,7 +182,7 @@
               item.state === "missing"
                 ? `<button data-id="${item.id}" class="row-apply">Apply Token</button>`
                 : "";
-            return `<div class="row">
+            return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
                 <div style="font-size:12px;color:${statusColor};">${item.message}</div>
@@ -198,6 +198,18 @@
             const id = btn.getAttribute("data-id");
             parent.postMessage(
               { pluginMessage: { type: "apply-token", nodeId: id, mode: getMode() } },
+              "*"
+            );
+          });
+        });
+
+        listEl.querySelectorAll(".row").forEach((row) => {
+          row.addEventListener("mouseenter", () => {
+            const id = row.querySelector(".row-apply")?.getAttribute("data-id") ??
+              row.getAttribute("data-id");
+            if (!id) return;
+            parent.postMessage(
+              { pluginMessage: { type: "highlight", nodeId: id, mode: getMode() } },
               "*"
             );
           });

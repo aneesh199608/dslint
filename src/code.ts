@@ -373,6 +373,17 @@ figma.ui.onmessage = async (msg) => {
     const height = Math.max(MIN_HEIGHT, Number(msg.height) || MIN_HEIGHT);
     figma.ui.resize(width, height);
   }
+
+  if (msg?.type === "highlight") {
+    try {
+      const node = (await figma.getNodeByIdAsync(msg.nodeId)) as SceneNode | null;
+      if (node) {
+        figma.currentPage.selection = [node];
+      }
+    } catch (error) {
+      console.error("Highlight error", error);
+    }
+  }
 };
 
 // TODO: Support strokes alongside fills.
