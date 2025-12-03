@@ -1,6 +1,7 @@
 import { sendStatus } from "./messages";
 import { findNearestColorVariable } from "./variables";
 import { scanSelection } from "./scanner";
+import { findMatchingTypographyVariable } from "./typography";
 import type { ModePreference } from "./types";
 import type { SolidPaint } from "@figma/plugin-typings";
 
@@ -76,18 +77,67 @@ export const applyNearestTokenToNode = async (
   }
 };
 
-export const applyAllMissing = async (preferredModeName: ModePreference) => {
+export const applyAllMissing = async (
+  preferredModeName: ModePreference,
+  opts?: { fills?: boolean; strokes?: boolean; typography?: boolean }
+) => {
   const results = await scanSelection(preferredModeName);
   if (!results.length) return;
 
   for (const item of results) {
-    if (item.fill?.state === "missing") {
+    if (opts?.fills !== false && item.fill?.state === "missing") {
       await applyNearestTokenToNode(item.id, preferredModeName, "fill");
     }
-    if (item.stroke?.state === "missing") {
+    if (opts?.strokes !== false && item.stroke?.state === "missing") {
       await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
+    }
+    if (opts?.typography !== false && item.typography?.state === "missing") {
+      await applyTypographyToNode(item.id, preferredModeName);
     }
   }
 
   await scanSelection(preferredModeName);
+};
+
+export const applyTypographyToNode = async (nodeId: string, preferredModeName: ModePreference) => {
+  try {
+    const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+    if (!node || node.type !== "TEXT") {
+      sendStatus({
+        title: "Apply failed",
+        message: "Typography apply only works on text nodes.",
+        state: "error",
+      });
+      return;
+    }
+
+    const match = await findMatchingTypographyVariable(node, preferredModeName);
+    if (!match) {
+      sendStatus({
+        title: "No matching typography token",
+        message: "Could not find a typography token that matches this text.",
+        state: "info",
+      });
+      return;
+    }
+
+    // Ensure font is loaded before applying style.
+    if (node.fontName !== figma.mixed) {
+      await figma.loadFontAsync(node.fontName as FontName);
+    }
+
+    node.textStyleId = match.variable.id;
+
+    sendStatus({
+      title: "Typography applied",
+      message: `Applied typography token: ${match.variable.name}`,
+      state: "applied",
+    });
+  } catch (error) {
+    sendStatus({
+      title: "Apply failed",
+      message: "Could not apply typography token.",
+      state: "error",
+    });
+  }
 };

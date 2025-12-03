@@ -1,6 +1,6 @@
 import { sendStatus } from "./messages";
 import { scanSelection } from "./scanner";
-import { applyAllMissing, applyNearestTokenToNode } from "./apply";
+import { applyAllMissing, applyNearestTokenToNode, applyTypographyToNode } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
 import type { ModePreference } from "./types";
 
@@ -27,7 +27,11 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token") {
     try {
-      await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
+      if (msg.target === "typography") {
+        await applyTypographyToNode(msg.nodeId, getMode(msg.mode));
+      } else {
+        await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
+      }
       await handleScan(msg.mode);
     } catch (error) {
       sendStatus({
@@ -42,7 +46,11 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token-all") {
     try {
-      await applyAllMissing(getMode(msg.mode));
+      await applyAllMissing(getMode(msg.mode), {
+        fills: msg.fills !== false,
+        strokes: msg.strokes !== false,
+        typography: msg.typography !== false,
+      });
       await handleScan(msg.mode);
     } catch (error) {
       sendStatus({

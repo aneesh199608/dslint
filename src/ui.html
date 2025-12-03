@@ -16,16 +16,19 @@
       }
       .top-bar {
         display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .row-flex {
+        display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        gap: 10px;
       }
       .actions {
         display: flex;
         gap: 8px;
-      }
-      .actions {
-        margin-top: 12px;
       }
       .icon-button {
         border: 1px solid #cbd5e1;
@@ -125,24 +128,17 @@
   </head>
   <body>
     <div class="top-bar">
-      <div></div>
-      <div class="actions">
-        <select id="filter" class="icon-button" title="Filter results">
-          <option value="missing">Missing only</option>
-          <option value="all">All</option>
-        </select>
-        <select id="theme" class="icon-button" title="Preferred mode">
-          <option value="Light">Light</option>
-          <option value="Dark">Dark</option>
-        </select>
-        <button
-          id="apply-all"
-          class="primary-button"
-          title="Apply nearest color tokens to all"
-          aria-label="Apply nearest color tokens to all"
-        >
-          Apply Token to All
-        </button>
+      <div class="row-flex">
+        <div class="actions">
+          <select id="filter" class="icon-button" title="Filter results">
+            <option value="missing">Missing only</option>
+            <option value="all">All</option>
+          </select>
+          <select id="theme" class="icon-button" title="Preferred mode">
+            <option value="Light">Light</option>
+            <option value="Dark">Dark</option>
+          </select>
+        </div>
         <button
           id="refresh"
           class="icon-button"
@@ -150,6 +146,28 @@
           aria-label="Refresh report"
         >
           Scan Again
+        </button>
+      </div>
+      <div class="row-flex">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
+          <input type="checkbox" id="chk-fills" checked />
+          Fills
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
+          <input type="checkbox" id="chk-strokes" checked />
+          Strokes
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
+          <input type="checkbox" id="chk-typo" checked />
+          Typography
+        </label>
+        <button
+          id="apply-all"
+          class="primary-button"
+          title="Apply nearest tokens to all"
+          aria-label="Apply nearest tokens to all"
+        >
+          Apply Token to All
         </button>
       </div>
     </div>
@@ -168,6 +186,9 @@
       const applyAllBtn = document.getElementById("apply-all");
       const themeSelect = document.getElementById("theme");
       const filterSelect = document.getElementById("filter");
+      const chkFills = document.getElementById("chk-fills");
+      const chkStrokes = document.getElementById("chk-strokes");
+      const chkTypo = document.getElementById("chk-typo");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
@@ -216,6 +237,9 @@
             const strokeStatus = item.stroke
               ? `<div style="font-size:12px;color:${item.stroke.state === "missing" ? "#b91c1c" : statusColor};">Stroke: ${item.stroke.message}</div>`
               : "";
+            const typoStatus = item.typography
+              ? `<div style="font-size:12px;color:${item.typography.state === "missing" ? "#b91c1c" : statusColor};">Typography: ${item.typography.message}</div>`
+              : "";
 
             const fillBtn =
               item.fill?.state === "missing"
@@ -225,13 +249,18 @@
               item.stroke?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="stroke" class="row-apply">Apply Stroke Token</button>`
                 : "";
+            const typoBtn =
+              item.typography?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="typography" class="row-apply">Apply Typography Token</button>`
+                : "";
 
-            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}</div>`;
+            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${typoBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
                 ${fillStatus || ""}
                 ${strokeStatus || ""}
+                ${typoStatus || ""}
               </div>
               ${buttons}
             </div>`;
@@ -292,7 +321,15 @@
 
       applyAllBtn?.addEventListener("click", () => {
         parent.postMessage(
-          { pluginMessage: { type: "apply-token-all", mode: getMode() } },
+          {
+            pluginMessage: {
+              type: "apply-token-all",
+              mode: getMode(),
+              fills: chkFills?.checked !== false,
+              strokes: chkStrokes?.checked !== false,
+              typography: chkTypo?.checked !== false,
+            },
+          },
           "*"
         );
       });

@@ -16,10 +16,17 @@ export type PaintInfo = {
   variableName?: string;
 };
 
+export type TypographyInfo = {
+  message: string;
+  state: StatusState;
+  variableName?: string;
+};
+
 export type NodeScanResult = {
   id: string;
   name: string;
   state: StatusState;
   fill?: PaintInfo;
   stroke?: PaintInfo;
+  typography?: TypographyInfo;
 };
