@@ -179,7 +179,7 @@ export const applyPaddingTokenToNode = async (
 
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
-  opts?: { fills?: boolean; strokes?: boolean; typography?: boolean }
+  opts?: { fills?: boolean; strokes?: boolean; padding?: boolean }
 ) => {
   const results = await scanSelection(preferredModeName);
   if (!results.length) return;
@@ -190,6 +190,9 @@ export const applyAllMissing = async (
     }
     if (opts?.strokes !== false && item.stroke?.state === "missing") {
       await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
+    }
+    if (opts?.padding !== false && item.padding?.state === "missing") {
+      await applyPaddingTokenToNode(item.id, preferredModeName);
     }
   }
 
