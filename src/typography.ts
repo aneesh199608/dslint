@@ -73,6 +73,22 @@ export const findMatchingTypographyVariable = async (
   return null;
 };
 
+export const findNumericVariableMatch = async (
+  kind: "fontSize" | "lineHeight" | "letterSpacing",
+  value: number
+) => {
+  const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
+  for (const variable of vars) {
+    const modeId = variable.defaultModeId ?? variable.modes?.[0]?.modeId;
+    if (!modeId) continue;
+    const v = variable.valuesByMode[modeId];
+    if (typeof v === "number" && Math.abs(v - value) < 1e-5) {
+      return variable;
+    }
+  }
+  return null;
+};
+
 export const applyTypographyVariable = async (nodeId: string, variableId: string) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || node.type !== "TEXT") return false;

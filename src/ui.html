@@ -157,10 +157,6 @@
           <input type="checkbox" id="chk-strokes" checked />
           Strokes
         </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
-          <input type="checkbox" id="chk-typo" checked />
-          Typography
-        </label>
         <button
           id="apply-all"
           class="primary-button"
@@ -188,7 +184,6 @@
       const filterSelect = document.getElementById("filter");
       const chkFills = document.getElementById("chk-fills");
       const chkStrokes = document.getElementById("chk-strokes");
-      const chkTypo = document.getElementById("chk-typo");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
@@ -249,10 +244,9 @@
               item.stroke?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="stroke" class="row-apply">Apply Stroke Token</button>`
                 : "";
-            const typoBtn =
-              item.typography?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="typography" class="row-apply">Apply Typography Token</button>`
-                : "";
+            const typoBtn = item.typography
+              ? `<button data-id="${item.id}" data-target="typography" class="row-apply" disabled title="Typography apply coming soon" style="opacity:0.5;cursor:not-allowed;">Apply Typography Token</button>`
+              : "";
 
             const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${typoBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
@@ -270,6 +264,7 @@
 
         listEl.querySelectorAll(".row-apply").forEach((btn) => {
           btn.addEventListener("click", () => {
+            if (btn.disabled) return;
             const id = btn.getAttribute("data-id");
             const target = btn.getAttribute("data-target") || "fill";
             parent.postMessage(
@@ -327,7 +322,6 @@
               mode: getMode(),
               fills: chkFills?.checked !== false,
               strokes: chkStrokes?.checked !== false,
-              typography: chkTypo?.checked !== false,
             },
           },
           "*"

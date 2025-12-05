@@ -49,7 +49,6 @@ figma.ui.onmessage = async (msg) => {
       await applyAllMissing(getMode(msg.mode), {
         fills: msg.fills !== false,
         strokes: msg.strokes !== false,
-        typography: msg.typography !== false,
       });
       await handleScan(msg.mode);
     } catch (error) {

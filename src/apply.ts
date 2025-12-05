@@ -1,7 +1,7 @@
 import { sendStatus } from "./messages";
 import { findNearestColorVariable } from "./variables";
 import { scanSelection } from "./scanner";
-import { findMatchingTypographyVariable } from "./typography";
+import { findMatchingTypographyVariable, findNumericVariableMatch } from "./typography";
 import type { ModePreference } from "./types";
 import type { SolidPaint } from "@figma/plugin-typings";
 
@@ -91,9 +91,6 @@ export const applyAllMissing = async (
     if (opts?.strokes !== false && item.stroke?.state === "missing") {
       await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
     }
-    if (opts?.typography !== false && item.typography?.state === "missing") {
-      await applyTypographyToNode(item.id, preferredModeName);
-    }
   }
 
   await scanSelection(preferredModeName);
@@ -111,27 +108,10 @@ export const applyTypographyToNode = async (nodeId: string, preferredModeName: M
       return;
     }
 
-    const match = await findMatchingTypographyVariable(node, preferredModeName);
-    if (!match) {
-      sendStatus({
-        title: "No matching typography token",
-        message: "Could not find a typography token that matches this text.",
-        state: "info",
-      });
-      return;
-    }
-
-    // Ensure font is loaded before applying style.
-    if (node.fontName !== figma.mixed) {
-      await figma.loadFontAsync(node.fontName as FontName);
-    }
-
-    node.textStyleId = match.variable.id;
-
     sendStatus({
-      title: "Typography applied",
-      message: `Applied typography token: ${match.variable.name}`,
-      state: "applied",
+      title: "Typography coming soon",
+      message: "Apply for typography tokens is not available yet.",
+      state: "info",
     });
   } catch (error) {
     sendStatus({

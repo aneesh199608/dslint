@@ -57,15 +57,8 @@ const evalPaint = async (
   };
 };
 
-const computeOverallState = (
-  fill?: PaintInfo | null,
-  stroke?: PaintInfo | null,
-  typography?: TypographyInfo | null
-): StatusState => {
+const computeOverallState = (fill?: PaintInfo | null, stroke?: PaintInfo | null): StatusState => {
   const parts = [fill, stroke].filter(Boolean) as PaintInfo[];
-  if (typography) {
-    parts.push({ kind: "fill", message: typography.message, state: typography.state });
-  }
   if (parts.some((p) => p.state === "missing")) return "missing";
   if (parts.some((p) => p.state === "error")) return "error";
   if (parts.some((p) => p.state === "found" || p.state === "applied")) return "found";
@@ -102,18 +95,18 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         const style = figma.getStyleById(boundId);
         typography = {
           message: `Using typography style: ${style?.name ?? "Text style"}`,
-          state: "found",
+          state: "info",
           variableName: style?.name,
         };
       } else if (match) {
         typography = {
-          message: `Matches typography token: ${match.variable.name}`,
-          state: "missing",
+          message: `Typography: matches ${match.variable.name} (coming soon)`,
+          state: "info",
           variableName: match.variable.name,
         };
       } else {
         typography = {
-          message: "No matching typography token found",
+          message: "Typography: no matching token (coming soon)",
           state: "info",
         };
       }
@@ -121,7 +114,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
 
     if (!fill && !stroke && !typography) continue;
 
-    const state = computeOverallState(fill, stroke, typography);
+    const state = computeOverallState(fill, stroke);
 
     results.push({
       id: node.id,

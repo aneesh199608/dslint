@@ -2,7 +2,7 @@ export const gatherNodesWithPaints = (nodes: readonly SceneNode[]): SceneNode[] 
   const result: SceneNode[] = [];
 
   const walk = (node: SceneNode) => {
-    if ("fills" in node || "strokes" in node) {
+    if (node.type === "TEXT" || "fills" in node || "strokes" in node) {
       result.push(node);
     }
     if ("children" in node) {
