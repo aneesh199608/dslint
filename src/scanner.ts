@@ -132,11 +132,11 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         bound?.paddingBottom?.id,
       ].filter(Boolean);
 
-      if (boundIds.length === 4 && new Set(boundIds).size === 1) {
+      if (boundIds.length === 4) {
         padding = {
-          message: "Padding bound to variable",
+          message: "Padding bound to variable(s)",
           state: "found",
-          variableName: bound?.paddingLeft?.id,
+          variableName: boundIds.join(", "),
         };
       } else {
         const uniform = pl === pr && pl === pt && pl === pb;
