@@ -1,6 +1,11 @@
 import { sendStatus } from "./messages";
 import { scanSelection } from "./scanner";
-import { applyAllMissing, applyNearestTokenToNode, applyTypographyToNode } from "./apply";
+import {
+  applyAllMissing,
+  applyNearestTokenToNode,
+  applyTypographyToNode,
+  applyPaddingTokenToNode,
+} from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
 import type { ModePreference } from "./types";
 
@@ -29,6 +34,8 @@ figma.ui.onmessage = async (msg) => {
     try {
       if (msg.target === "typography") {
         await applyTypographyToNode(msg.nodeId, getMode(msg.mode));
+      } else if (msg.target === "padding") {
+        await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode));
       } else {
         await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
       }

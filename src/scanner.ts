@@ -2,6 +2,7 @@ import { rgbToHex } from "./colors";
 import { sendStatus } from "./messages";
 import { gatherNodesWithPaints } from "./selection";
 import { findMatchingTypographyVariable } from "./typography";
+import { findSpacingVariable } from "./spacing";
 import { setOriginalSelection } from "./highlight";
 import type {
   ModePreference,
@@ -9,6 +10,7 @@ import type {
   PaintInfo,
   StatusState,
   TypographyInfo,
+  PaddingInfo,
 } from "./types";
 
 const evalPaint = async (
@@ -57,11 +59,15 @@ const evalPaint = async (
   };
 };
 
-const computeOverallState = (fill?: PaintInfo | null, stroke?: PaintInfo | null): StatusState => {
-  const parts = [fill, stroke].filter(Boolean) as PaintInfo[];
-  if (parts.some((p) => p.state === "missing")) return "missing";
-  if (parts.some((p) => p.state === "error")) return "error";
-  if (parts.some((p) => p.state === "found" || p.state === "applied")) return "found";
+const computeOverallState = (
+  fill?: PaintInfo | null,
+  stroke?: PaintInfo | null,
+  padding?: PaddingInfo | null
+): StatusState => {
+  const states = [fill?.state, stroke?.state, padding?.state].filter(Boolean) as StatusState[];
+  if (states.some((s) => s === "missing")) return "missing";
+  if (states.some((s) => s === "error")) return "error";
+  if (states.some((s) => s === "found" || s === "applied")) return "found";
   return "info";
 };
 
@@ -86,6 +92,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     const fill = await evalPaint(node, "fill", preferredModeName);
     const stroke = await evalPaint(node, "stroke", preferredModeName);
     let typography: TypographyInfo | undefined;
+    let padding: PaddingInfo | undefined;
 
     if (node.type === "TEXT") {
       const match = await findMatchingTypographyVariable(node, preferredModeName);
@@ -112,9 +119,81 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       }
     }
 
-    if (!fill && !stroke && !typography) continue;
+    if ("paddingLeft" in node) {
+      const pl = (node as LayoutMixin).paddingLeft;
+      const pr = (node as LayoutMixin).paddingRight;
+      const pt = (node as LayoutMixin).paddingTop;
+      const pb = (node as LayoutMixin).paddingBottom;
+      const bound = (node as any).boundVariables;
+      const boundIds = [
+        bound?.paddingLeft?.id,
+        bound?.paddingRight?.id,
+        bound?.paddingTop?.id,
+        bound?.paddingBottom?.id,
+      ].filter(Boolean);
 
-    const state = computeOverallState(fill, stroke);
+      if (boundIds.length === 4 && new Set(boundIds).size === 1) {
+        padding = {
+          message: "Padding bound to variable",
+          state: "found",
+          variableName: bound?.paddingLeft?.id,
+        };
+      } else {
+        const uniform = pl === pr && pl === pt && pl === pb;
+        const horizontal = pl === pr && pt === pb;
+        if (uniform) {
+          const match = await findSpacingVariable(pl);
+          if (match) {
+            padding = {
+              message: `Padding matches token: ${match.name}`,
+              state: "missing",
+              variableName: match.name,
+            };
+          } else {
+            padding = {
+              message: "Padding has no matching token",
+              state: "info",
+            };
+          }
+        } else if (horizontal) {
+          const hMatch = await findSpacingVariable(pl);
+          const vMatch = await findSpacingVariable(pt);
+          if (hMatch && vMatch) {
+            padding = {
+              message: `Padding matches tokens H:${hMatch.name} V:${vMatch.name}`,
+              state: "missing",
+              variableName: `${hMatch.name} / ${vMatch.name}`,
+            };
+          } else {
+            padding = {
+              message: "Padding has no matching token",
+              state: "info",
+            };
+          }
+        } else {
+          const topVar = await findSpacingVariable(pt);
+          const rightVar = await findSpacingVariable(pr);
+          const bottomVar = await findSpacingVariable(pb);
+          const leftVar = await findSpacingVariable(pl);
+          if (topVar && rightVar && bottomVar && leftVar) {
+            padding = {
+              message: `Padding matches tokens T:${topVar.name} R:${rightVar.name} B:${bottomVar.name} L:${leftVar.name}`,
+              state: "missing",
+              variableName: `${topVar.name} / ${rightVar.name} / ${bottomVar.name} / ${leftVar.name}`,
+            };
+          } else {
+            padding = {
+              message: "Padding has no matching token",
+              state: "info",
+            };
+          }
+        }
+      }
+    }
+
+    if (!fill && !stroke && !typography && !padding) continue;
+
+    const state = computeOverallState(fill, stroke, padding);
 
     results.push({
       id: node.id,
@@ -123,6 +202,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       fill: fill || undefined,
       stroke: stroke || undefined,
       typography,
+      padding,
     });
   }
 

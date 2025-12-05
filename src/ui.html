@@ -157,6 +157,10 @@
           <input type="checkbox" id="chk-strokes" checked />
           Strokes
         </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
+          <input type="checkbox" id="chk-padding" checked />
+          Paddings
+        </label>
         <button
           id="apply-all"
           class="primary-button"
@@ -184,6 +188,7 @@
       const filterSelect = document.getElementById("filter");
       const chkFills = document.getElementById("chk-fills");
       const chkStrokes = document.getElementById("chk-strokes");
+      const chkPadding = document.getElementById("chk-padding");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
@@ -232,6 +237,9 @@
             const strokeStatus = item.stroke
               ? `<div style="font-size:12px;color:${item.stroke.state === "missing" ? "#b91c1c" : statusColor};">Stroke: ${item.stroke.message}</div>`
               : "";
+            const paddingStatus = item.padding
+              ? `<div style="font-size:12px;color:${item.padding.state === "missing" ? "#b91c1c" : "#475569"};">Padding: ${item.padding.message}</div>`
+              : "";
             const typoStatus = item.typography
               ? `<div style="font-size:12px;color:${item.typography.state === "missing" ? "#b91c1c" : statusColor};">Typography: ${item.typography.message}</div>`
               : "";
@@ -244,16 +252,21 @@
               item.stroke?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="stroke" class="row-apply">Apply Stroke Token</button>`
                 : "";
+            const paddingBtn =
+              item.padding?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="padding" class="row-apply">Apply Padding Token</button>`
+                : "";
             const typoBtn = item.typography
               ? `<button data-id="${item.id}" data-target="typography" class="row-apply" disabled title="Typography apply coming soon" style="opacity:0.5;cursor:not-allowed;">Apply Typography Token</button>`
               : "";
 
-            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${typoBtn}</div>`;
+            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${paddingBtn}${typoBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
                 ${fillStatus || ""}
                 ${strokeStatus || ""}
+                ${paddingStatus || ""}
                 ${typoStatus || ""}
               </div>
               ${buttons}
@@ -322,6 +335,7 @@
               mode: getMode(),
               fills: chkFills?.checked !== false,
               strokes: chkStrokes?.checked !== false,
+              padding: chkPadding?.checked !== false,
             },
           },
           "*"

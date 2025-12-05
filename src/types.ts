@@ -22,6 +22,12 @@ export type TypographyInfo = {
   variableName?: string;
 };
 
+export type PaddingInfo = {
+  message: string;
+  state: StatusState;
+  variableName?: string;
+};
+
 export type NodeScanResult = {
   id: string;
   name: string;
@@ -29,4 +35,5 @@ export type NodeScanResult = {
   fill?: PaintInfo;
   stroke?: PaintInfo;
   typography?: TypographyInfo;
+  padding?: PaddingInfo;
 };

@@ -2,6 +2,7 @@ import { sendStatus } from "./messages";
 import { findNearestColorVariable } from "./variables";
 import { scanSelection } from "./scanner";
 import { findMatchingTypographyVariable, findNumericVariableMatch } from "./typography";
+import { findSpacingVariable } from "./spacing";
 import type { ModePreference } from "./types";
 import type { SolidPaint } from "@figma/plugin-typings";
 
@@ -75,6 +76,105 @@ export const applyNearestTokenToNode = async (
   } else {
     (node as GeometryMixin).strokes = [updatedPaint];
   }
+};
+
+export const applyPaddingTokenToNode = async (
+  nodeId: string,
+  preferredModeName: ModePreference
+) => {
+  const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+  if (!node || !("paddingLeft" in node)) {
+    sendStatus({
+      title: "Unsupported selection",
+      message: "Padding apply works on frames/components/instances with padding.",
+      state: "error",
+    });
+    return;
+  }
+
+  const pl = (node as LayoutMixin).paddingLeft;
+  const pr = (node as LayoutMixin).paddingRight;
+  const pt = (node as LayoutMixin).paddingTop;
+  const pb = (node as LayoutMixin).paddingBottom;
+
+  const isUniform = pl === pr && pl === pt && pl === pb;
+  if (isUniform) {
+    const match = await findSpacingVariable(pl);
+    if (!match) {
+      sendStatus({
+        title: "No padding token found",
+        message: "No matching spacing token for this padding value.",
+      state: "info",
+    });
+    return;
+  }
+
+  node.setBoundVariable("paddingLeft", { id: match.id, type: "VARIABLE_ALIAS" });
+  node.setBoundVariable("paddingRight", { id: match.id, type: "VARIABLE_ALIAS" });
+  node.setBoundVariable("paddingTop", { id: match.id, type: "VARIABLE_ALIAS" });
+  node.setBoundVariable("paddingBottom", { id: match.id, type: "VARIABLE_ALIAS" });
+    sendStatus({
+      title: "Padding token applied",
+      message: `Applied padding token: ${match.name}`,
+      state: "applied",
+    });
+    return;
+  }
+
+  const isHorizontal = pl === pr && pt === pb;
+  if (isHorizontal) {
+    const hVar = await findSpacingVariable(pl);
+    const vVar = await findSpacingVariable(pt);
+    if (!hVar && !vVar) {
+      sendStatus({
+        title: "No padding tokens found",
+        message: "No matching spacing tokens for padding values.",
+        state: "info",
+      });
+      return;
+    }
+
+    if (hVar) {
+      node.setBoundVariable("paddingLeft", { id: hVar.id, type: "VARIABLE_ALIAS" });
+      node.setBoundVariable("paddingRight", { id: hVar.id, type: "VARIABLE_ALIAS" });
+    }
+    if (vVar) {
+      node.setBoundVariable("paddingTop", { id: vVar.id, type: "VARIABLE_ALIAS" });
+      node.setBoundVariable("paddingBottom", { id: vVar.id, type: "VARIABLE_ALIAS" });
+    }
+    sendStatus({
+      title: "Padding tokens applied",
+      message: "Applied padding tokens for horizontal/vertical.",
+      state: "applied",
+    });
+    return;
+  }
+
+  // Per-side binding if possible.
+  const topVar = await findSpacingVariable(pt);
+  const rightVar = await findSpacingVariable(pr);
+  const bottomVar = await findSpacingVariable(pb);
+  const leftVar = await findSpacingVariable(pl);
+
+  if (!topVar && !rightVar && !bottomVar && !leftVar) {
+    sendStatus({
+      title: "No padding tokens found",
+      message: "No matching spacing tokens for padding values.",
+      state: "info",
+    });
+    return;
+  }
+
+  if (topVar) node.setBoundVariable("paddingTop", { id: topVar.id, type: "VARIABLE_ALIAS" });
+  if (rightVar) node.setBoundVariable("paddingRight", { id: rightVar.id, type: "VARIABLE_ALIAS" });
+  if (bottomVar) node.setBoundVariable("paddingBottom", { id: bottomVar.id, type: "VARIABLE_ALIAS" });
+  if (leftVar) node.setBoundVariable("paddingLeft", { id: leftVar.id, type: "VARIABLE_ALIAS" });
+
+  sendStatus({
+    title: "Padding tokens applied",
+    message: "Applied available padding tokens.",
+    state: "applied",
+  });
 };
 
 export const applyAllMissing = async (
