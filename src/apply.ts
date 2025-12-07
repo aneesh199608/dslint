@@ -97,8 +97,26 @@ export const applyPaddingTokenToNode = async (
   const pt = (node as LayoutMixin).paddingTop;
   const pb = (node as LayoutMixin).paddingBottom;
 
+  const allZero = pl === 0 && pr === 0 && pt === 0 && pb === 0;
+  if (allZero) {
+    sendStatus({
+      title: "No padding tokens applied",
+      message: "Padding is 0 on all sides; nothing to tokenize.",
+      state: "info",
+    });
+    return;
+  }
+
   const isUniform = pl === pr && pl === pt && pl === pb;
   if (isUniform) {
+    if (pl === 0) {
+      sendStatus({
+        title: "No padding tokens applied",
+        message: "Padding is 0; nothing to tokenize.",
+        state: "info",
+      });
+      return;
+    }
     const match = await findSpacingVariable(pl);
     if (!match) {
       sendStatus({
@@ -123,8 +141,8 @@ export const applyPaddingTokenToNode = async (
 
   const isHorizontal = pl === pr && pt === pb;
   if (isHorizontal) {
-    const hVar = await findSpacingVariable(pl);
-    const vVar = await findSpacingVariable(pt);
+    const hVar = pl > 0 ? await findSpacingVariable(pl) : null;
+    const vVar = pt > 0 ? await findSpacingVariable(pt) : null;
     if (!hVar && !vVar) {
       sendStatus({
         title: "No padding tokens found",
@@ -151,10 +169,10 @@ export const applyPaddingTokenToNode = async (
   }
 
   // Per-side binding if possible.
-  const topVar = await findSpacingVariable(pt);
-  const rightVar = await findSpacingVariable(pr);
-  const bottomVar = await findSpacingVariable(pb);
-  const leftVar = await findSpacingVariable(pl);
+  const topVar = pt > 0 ? await findSpacingVariable(pt) : null;
+  const rightVar = pr > 0 ? await findSpacingVariable(pr) : null;
+  const bottomVar = pb > 0 ? await findSpacingVariable(pb) : null;
+  const leftVar = pl > 0 ? await findSpacingVariable(pl) : null;
 
   if (!topVar && !rightVar && !bottomVar && !leftVar) {
     sendStatus({

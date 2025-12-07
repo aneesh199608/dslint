@@ -134,74 +134,47 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       const pt = (node as LayoutMixin).paddingTop;
       const pb = (node as LayoutMixin).paddingBottom;
       const bound = (node as any).boundVariables;
-      const boundIds = [
-        bound?.paddingLeft?.id,
-        bound?.paddingRight?.id,
-        bound?.paddingTop?.id,
-        bound?.paddingBottom?.id,
-      ].filter(Boolean);
-
-      if (boundIds.length === 4) {
-        padding = {
-          message: "Padding bound to variable(s)",
-          state: "found",
-          variableName: boundIds.join(", "),
-        };
-      } else if (isAutoLayout) {
-        const uniform = pl === pr && pl === pt && pl === pb;
-        const horizontal = pl === pr && pt === pb;
-        if (uniform) {
-          const match = await findSpacingVariable(pl);
-          if (match) {
-            padding = {
-              message: `Padding matches token: ${match.name}`,
-              state: "missing",
-              variableName: match.name,
-            };
-          } else {
-            padding = {
-              message: "Padding has no matching token",
-              state: "info",
-            };
-          }
-        } else if (horizontal) {
-          const hMatch = await findSpacingVariable(pl);
-          const vMatch = await findSpacingVariable(pt);
-          if (hMatch && vMatch) {
-            padding = {
-              message: `Padding matches tokens H:${hMatch.name} V:${vMatch.name}`,
-              state: "missing",
-              variableName: `${hMatch.name} / ${vMatch.name}`,
-            };
-          } else {
-            padding = {
-              message: "Padding has no matching token",
-              state: "info",
-            };
-          }
-        } else {
-          const topVar = await findSpacingVariable(pt);
-          const rightVar = await findSpacingVariable(pr);
-          const bottomVar = await findSpacingVariable(pb);
-          const leftVar = await findSpacingVariable(pl);
-          if (topVar && rightVar && bottomVar && leftVar) {
-            padding = {
-              message: `Padding matches tokens T:${topVar.name} R:${rightVar.name} B:${bottomVar.name} L:${leftVar.name}`,
-              state: "missing",
-              variableName: `${topVar.name} / ${rightVar.name} / ${bottomVar.name} / ${leftVar.name}`,
-            };
-          } else {
-            padding = {
-              message: "Padding has no matching token",
-              state: "info",
-            };
-          }
-        }
-      } else {
+      const sides = [
+        { value: pl, bound: bound?.paddingLeft?.id, label: "L" },
+        { value: pr, bound: bound?.paddingRight?.id, label: "R" },
+        { value: pt, bound: bound?.paddingTop?.id, label: "T" },
+        { value: pb, bound: bound?.paddingBottom?.id, label: "B" },
+      ];
+      const relevant = sides.filter((s) => s.value > 0);
+      if (!relevant.length) {
+        padding = undefined;
+      } else if (!isAutoLayout) {
         padding = {
           message: "Padding present (auto layout off)",
           state: "info",
         };
+      } else {
+        const allRelevantBound = relevant.every((s) => Boolean(s.bound));
+        if (allRelevantBound) {
+          padding = {
+            message: "Padding bound to variable(s)",
+            state: "found",
+            variableName: relevant.map((s) => s.bound).filter(Boolean).join(", "),
+          };
+        } else {
+          const matches = await Promise.all(
+            relevant.map(async (s) => ({ ...s, match: await findSpacingVariable(s.value) }))
+          );
+          const unmatched = matches.filter((m) => !m.match);
+          if (unmatched.length) {
+            padding = {
+              message: "Padding has no matching token",
+              state: "info",
+            };
+          } else {
+            const parts = matches.map((m) => `${m.label}:${m.match!.name}`).join(" ");
+            padding = {
+              message: `Padding matches tokens ${parts}`,
+              state: "missing",
+              variableName: matches.map((m) => m.match!.name).join(" / "),
+            };
+          }
+        }
       }
     }
 
