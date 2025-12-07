@@ -120,6 +120,8 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     }
 
     if ("paddingLeft" in node) {
+      const layoutMode = (node as any).layoutMode;
+      const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
       const pl = (node as LayoutMixin).paddingLeft;
       const pr = (node as LayoutMixin).paddingRight;
       const pt = (node as LayoutMixin).paddingTop;
@@ -138,7 +140,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
           state: "found",
           variableName: boundIds.join(", "),
         };
-      } else {
+      } else if (isAutoLayout) {
         const uniform = pl === pr && pl === pt && pl === pb;
         const horizontal = pl === pr && pt === pb;
         if (uniform) {
@@ -188,6 +190,11 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
             };
           }
         }
+      } else {
+        padding = {
+          message: "Padding present (auto layout off)",
+          state: "info",
+        };
       }
     }
 
