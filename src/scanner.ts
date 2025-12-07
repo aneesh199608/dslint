@@ -99,12 +99,19 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       const boundId = node.textStyleId;
 
       if (boundId) {
-        const style = figma.getStyleById(boundId);
-        typography = {
-          message: `Using typography style: ${style?.name ?? "Text style"}`,
-          state: "info",
-          variableName: style?.name,
-        };
+        try {
+          const style = await figma.getStyleByIdAsync(boundId);
+          typography = {
+            message: `Using typography style: ${style?.name ?? "Text style"}`,
+            state: "info",
+            variableName: style?.name,
+          };
+        } catch (err) {
+          typography = {
+            message: "Typography style bound (details unavailable)",
+            state: "info",
+          };
+        }
       } else if (match) {
         typography = {
           message: `Typography: matches ${match.variable.name} (coming soon)`,
