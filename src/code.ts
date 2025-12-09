@@ -5,6 +5,7 @@ import {
   applyNearestTokenToNode,
   applyTypographyToNode,
   applyPaddingTokenToNode,
+  applyGapTokenToNode,
 } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
 import type { ModePreference } from "./types";
@@ -36,6 +37,8 @@ figma.ui.onmessage = async (msg) => {
         await applyTypographyToNode(msg.nodeId, getMode(msg.mode));
       } else if (msg.target === "padding") {
         await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode));
+      } else if (msg.target === "gap") {
+        await applyGapTokenToNode(msg.nodeId, getMode(msg.mode));
       } else {
         await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
       }
@@ -53,9 +56,12 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token-all") {
     try {
+      const spacingFlag =
+        msg.spacing !== undefined ? msg.spacing !== false : msg.padding !== false;
       await applyAllMissing(getMode(msg.mode), {
         fills: msg.fills !== false,
         strokes: msg.strokes !== false,
+        spacing: spacingFlag,
       });
       await handleScan(msg.mode);
     } catch (error) {

@@ -11,7 +11,10 @@ import type {
   StatusState,
   TypographyInfo,
   PaddingInfo,
+  GapInfo,
 } from "./types";
+
+const isZero = (value: number | null | undefined) => Math.abs(value ?? 0) < 0.000001;
 
 const evalPaint = async (
   node: SceneNode,
@@ -62,9 +65,12 @@ const evalPaint = async (
 const computeOverallState = (
   fill?: PaintInfo | null,
   stroke?: PaintInfo | null,
-  padding?: PaddingInfo | null
+  padding?: PaddingInfo | null,
+  gap?: GapInfo | null
 ): StatusState => {
-  const states = [fill?.state, stroke?.state, padding?.state].filter(Boolean) as StatusState[];
+  const states = [fill?.state, stroke?.state, padding?.state, gap?.state].filter(
+    Boolean
+  ) as StatusState[];
   if (states.some((s) => s === "missing")) return "missing";
   if (states.some((s) => s === "error")) return "error";
   if (states.some((s) => s === "found" || s === "applied")) return "found";
@@ -93,6 +99,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     const stroke = await evalPaint(node, "stroke", preferredModeName);
     let typography: TypographyInfo | undefined;
     let padding: PaddingInfo | undefined;
+    let gap: GapInfo | undefined;
 
     if (node.type === "TEXT") {
       const match = await findMatchingTypographyVariable(node, preferredModeName);
@@ -140,9 +147,9 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         { value: pt, bound: bound?.paddingTop?.id, label: "T" },
         { value: pb, bound: bound?.paddingBottom?.id, label: "B" },
       ];
-      const relevant = sides.filter((s) => s.value > 0);
+      const relevant = sides.filter((s) => !isZero(s.value));
       if (!relevant.length) {
-        padding = undefined;
+        padding = undefined; // all zeros: ignore
       } else if (!isAutoLayout) {
         padding = {
           message: "Padding present (auto layout off)",
@@ -178,9 +185,41 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       }
     }
 
-    if (!fill && !stroke && !typography && !padding) continue;
+    if ("itemSpacing" in node && "layoutMode" in node) {
+      const layoutMode = (node as any).layoutMode;
+      const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
+      const spacing = (node as LayoutMixin).itemSpacing;
+      if (!isZero(spacing)) {
+        if (!isAutoLayout) {
+          gap = { message: "Gap present (auto layout off)", state: "info" };
+        } else {
+          const boundId = (node as any).boundVariables?.itemSpacing?.id;
+          if (boundId) {
+            const variable = await figma.variables.getVariableByIdAsync(boundId);
+            gap = {
+              message: `Gap using variable: ${variable?.name ?? "Spacing variable"}`,
+              state: "found",
+              variableName: variable?.name,
+            };
+          } else {
+            const match = await findSpacingVariable(spacing);
+            if (match) {
+              gap = {
+                message: `Gap matches token ${match.name}`,
+                state: "missing",
+                variableName: match.name,
+              };
+            } else {
+              gap = { message: "Gap has no matching token", state: "info" };
+            }
+          }
+        }
+      }
+    }
 
-    const state = computeOverallState(fill, stroke, padding);
+    if (!fill && !stroke && !typography && !padding && !gap) continue;
+
+    const state = computeOverallState(fill, stroke, padding, gap);
 
     results.push({
       id: node.id,
@@ -190,6 +229,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       stroke: stroke || undefined,
       typography,
       padding,
+      gap,
     });
   }
 

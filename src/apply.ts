@@ -122,15 +122,15 @@ export const applyPaddingTokenToNode = async (
       sendStatus({
         title: "No padding token found",
         message: "No matching spacing token for this padding value.",
-      state: "info",
-    });
-    return;
-  }
+        state: "info",
+      });
+      return;
+    }
 
-  node.setBoundVariable("paddingLeft", { id: match.id, type: "VARIABLE_ALIAS" });
-  node.setBoundVariable("paddingRight", { id: match.id, type: "VARIABLE_ALIAS" });
-  node.setBoundVariable("paddingTop", { id: match.id, type: "VARIABLE_ALIAS" });
-  node.setBoundVariable("paddingBottom", { id: match.id, type: "VARIABLE_ALIAS" });
+    node.setBoundVariable("paddingLeft", { id: match.id, type: "VARIABLE_ALIAS" });
+    node.setBoundVariable("paddingRight", { id: match.id, type: "VARIABLE_ALIAS" });
+    node.setBoundVariable("paddingTop", { id: match.id, type: "VARIABLE_ALIAS" });
+    node.setBoundVariable("paddingBottom", { id: match.id, type: "VARIABLE_ALIAS" });
     sendStatus({
       title: "Padding token applied",
       message: `Applied padding token: ${match.name}`,
@@ -195,9 +195,60 @@ export const applyPaddingTokenToNode = async (
   });
 };
 
+export const applyGapTokenToNode = async (nodeId: string, preferredModeName: ModePreference) => {
+  const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+  if (!node || !("itemSpacing" in node) || !("layoutMode" in node)) {
+    sendStatus({
+      title: "Unsupported selection",
+      message: "Gap apply works on auto layout frames/components/instances.",
+      state: "error",
+    });
+    return;
+  }
+
+  const layoutMode = (node as any).layoutMode;
+  const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
+  if (!isAutoLayout) {
+    sendStatus({
+      title: "Gap not applied",
+      message: "Gap applies only to auto layout nodes.",
+      state: "info",
+    });
+    return;
+  }
+
+  const spacing = (node as LayoutMixin).itemSpacing;
+  if (!spacing || spacing <= 0) {
+    sendStatus({
+      title: "No gap token applied",
+      message: "Gap is 0; nothing to tokenize.",
+      state: "info",
+    });
+    return;
+  }
+
+  const match = await findSpacingVariable(spacing);
+  if (!match) {
+    sendStatus({
+      title: "No gap token found",
+      message: "No matching spacing token for this gap value.",
+      state: "info",
+    });
+    return;
+  }
+
+  (node as any).setBoundVariable("itemSpacing", { id: match.id, type: "VARIABLE_ALIAS" });
+
+  sendStatus({
+    title: "Gap token applied",
+    message: `Applied gap token: ${match.name}`,
+    state: "applied",
+  });
+};
+
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
-  opts?: { fills?: boolean; strokes?: boolean; padding?: boolean }
+  opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean }
 ) => {
   const results = await scanSelection(preferredModeName);
   if (!results.length) return;
@@ -209,8 +260,11 @@ export const applyAllMissing = async (
     if (opts?.strokes !== false && item.stroke?.state === "missing") {
       await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
     }
-    if (opts?.padding !== false && item.padding?.state === "missing") {
+    if (opts?.spacing !== false && item.padding?.state === "missing") {
       await applyPaddingTokenToNode(item.id, preferredModeName);
+    }
+    if (opts?.spacing !== false && item.gap?.state === "missing") {
+      await applyGapTokenToNode(item.id, preferredModeName);
     }
   }
 

@@ -28,6 +28,12 @@ export type PaddingInfo = {
   variableName?: string;
 };
 
+export type GapInfo = {
+  message: string;
+  state: StatusState;
+  variableName?: string;
+};
+
 export type NodeScanResult = {
   id: string;
   name: string;
@@ -36,4 +42,5 @@ export type NodeScanResult = {
   stroke?: PaintInfo;
   typography?: TypographyInfo;
   padding?: PaddingInfo;
+  gap?: GapInfo;
 };
