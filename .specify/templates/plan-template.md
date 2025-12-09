@@ -1,6 +1,6 @@
 # Implementation Plan: [FEATURE]
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Date**: [DATE] | **Spec**: [link]  
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
@@ -31,7 +31,11 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Non-destructive first: plans MUST separate scan/read actions from apply/mutate and default to read-only.
+- Mode fidelity: plans MUST specify Light/Dark handling and fallback behavior for variable resolution.
+- Selection safety: interactions MUST restore the user’s selection after highlights/navigation.
+- Offline & deterministic: solutions MUST avoid network calls and handle missing tokens/aliases gracefully.
+- Lean UX/perf: plans MUST describe how UI avoids heavy re-renders on large selections and reports status counts clearly.
 
 ## Project Structure
 

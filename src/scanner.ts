@@ -12,6 +12,7 @@ import type {
   TypographyInfo,
   PaddingInfo,
   GapInfo,
+  CornerRadiusInfo,
 } from "./types";
 
 const isZero = (value: number | null | undefined) => Math.abs(value ?? 0) < 0.000001;
@@ -108,9 +109,10 @@ const computeOverallState = (
   fill?: PaintInfo | null,
   stroke?: PaintInfo | null,
   padding?: PaddingInfo | null,
-  gap?: GapInfo | null
+  gap?: GapInfo | null,
+  cornerRadius?: CornerRadiusInfo | null
 ): StatusState => {
-  const states = [fill?.state, stroke?.state, padding?.state, gap?.state].filter(
+  const states = [fill?.state, stroke?.state, padding?.state, gap?.state, cornerRadius?.state].filter(
     Boolean
   ) as StatusState[];
   if (states.some((s) => s === "missing")) return "missing";
@@ -142,6 +144,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     let typography: TypographyInfo | undefined;
     let padding: PaddingInfo | undefined;
     let gap: GapInfo | undefined;
+    let cornerRadius: CornerRadiusInfo | undefined;
 
     if (node.type === "TEXT") {
       const match = await findMatchingTypographyVariable(node, preferredModeName);
@@ -252,16 +255,112 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
                 variableName: match.name,
               };
             } else {
-              gap = { message: "Gap has no matching token", state: "info" };
+          gap = { message: "Gap has no matching token", state: "info" };
+        }
+      }
+    }
+
+    if ("cornerRadius" in node) {
+      const bound = (node as any).boundVariables;
+      const radius = (node as any).cornerRadius;
+
+      const getVariableName = async (id?: string) => {
+        if (!id) return undefined;
+        const variable = await figma.variables.getVariableByIdAsync(id);
+        return variable?.name;
+      };
+
+      const setFound = async (id?: string) => {
+        const variableName = await getVariableName(id);
+        cornerRadius = {
+          message: `Corner radius using variable${variableName ? `: ${variableName}` : ""}`,
+          state: "found",
+          variableName,
+        };
+      };
+
+      if (typeof radius === "number") {
+        if (isZero(radius)) {
+          cornerRadius = undefined; // treat 0 as absent
+        } else {
+          const boundId =
+            bound?.cornerRadius?.id ??
+            bound?.topLeftRadius?.id ??
+            bound?.topRightRadius?.id ??
+            bound?.bottomRightRadius?.id ??
+            bound?.bottomLeftRadius?.id;
+          if (boundId) {
+            await setFound(boundId);
+          } else {
+            const match = await findSpacingVariable(radius);
+            if (match) {
+              cornerRadius = {
+                message: `Corner radius matches token ${match.name}`,
+                state: "missing",
+                variableName: match.name,
+              };
+            } else {
+              cornerRadius = {
+                message: "Corner radius has no matching token",
+                state: "info",
+              };
+            }
+          }
+        }
+      } else if (radius === figma.mixed) {
+        const corners = [
+          { label: "TL", value: (node as any).topLeftRadius, bound: bound?.topLeftRadius?.id },
+          { label: "TR", value: (node as any).topRightRadius, bound: bound?.topRightRadius?.id },
+          { label: "BR", value: (node as any).bottomRightRadius, bound: bound?.bottomRightRadius?.id },
+          { label: "BL", value: (node as any).bottomLeftRadius, bound: bound?.bottomLeftRadius?.id },
+        ].filter((c) => typeof c.value === "number" && !isZero(c.value));
+
+        if (!corners.length) {
+          cornerRadius = undefined;
+        } else {
+          const allBound = corners.every((c) => Boolean(c.bound));
+          if (allBound) {
+            await setFound(corners[0].bound);
+          } else {
+            const matches = await Promise.all(
+              corners.map(async (c) => ({
+                ...c,
+                match: c.bound ? null : await findSpacingVariable(c.value as number),
+              }))
+            );
+            const matched = matches.filter((m) => m.match);
+            if (!matched.length) {
+              cornerRadius = {
+                message: "Corner radius has no matching token",
+                state: "info",
+              };
+            } else {
+              const parts = matches
+                .map((m) => {
+                  if (m.bound) return `${m.label}:bound`;
+                  if (m.match) return `${m.label}:${m.match.name}`;
+                  return `${m.label}:?`;
+                })
+                .join(" ");
+              cornerRadius = {
+                message: `Corner radius matches tokens ${parts}`,
+                state: "missing",
+                variableName: matches
+                  .map((m) => (m.match ? m.match.name : ""))
+                  .filter(Boolean)
+                  .join(" / "),
+              };
             }
           }
         }
       }
     }
+      }
+    }
 
-    if (!fill && !stroke && !typography && !padding && !gap) continue;
+    if (!fill && !stroke && !typography && !padding && !gap && !cornerRadius) continue;
 
-    const state = computeOverallState(fill, stroke, padding, gap);
+    const state = computeOverallState(fill, stroke, padding, gap, cornerRadius);
 
     results.push({
       id: node.id,
@@ -272,6 +371,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       typography,
       padding,
       gap,
+      cornerRadius,
     });
   }
 

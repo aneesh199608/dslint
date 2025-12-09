@@ -34,6 +34,12 @@ export type GapInfo = {
   variableName?: string;
 };
 
+export type CornerRadiusInfo = {
+  message: string;
+  state: StatusState;
+  variableName?: string;
+};
+
 export type NodeScanResult = {
   id: string;
   name: string;
@@ -43,4 +49,5 @@ export type NodeScanResult = {
   typography?: TypographyInfo;
   padding?: PaddingInfo;
   gap?: GapInfo;
+  cornerRadius?: CornerRadiusInfo;
 };

@@ -1,50 +1,39 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: 1.0.0 → 1.0.1
+- Modified principles: clarified names/intent, no additions or removals
+- Added sections: none
+- Removed sections: none
+- Templates requiring updates: plan-template.md ✅ (Constitution Check gates aligned); spec-template.md ⚠ (leave placeholders until feature specs are authored); tasks-template.md ⚠ (keep sample tasks placeholder-only)
+- Follow-up TODOs: none
+-->
+
+# DSLint Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Token-First Read, Opt-In Apply
+Scans default to non-destructive inspection; mutations happen only from explicit user actions (row apply or bulk apply). Prefer binding to variables/styles over rewriting raw values and skip applies when a node is already bound.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Mode Fidelity
+Resolve variables using the user-selected mode (Light/Dark) with safe fallbacks; if a mode cannot be resolved, surface a warning instead of applying. Preserve alpha semantics and avoid applying clearly wrong tokens when opacity deltas are too large.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Selection Safety & Context Preservation
+Capture and restore the user’s selection when highlighting; never leave the canvas in a different selection state unintentionally. When walking frames, include relevant descendants for reporting but only mutate nodes when a user explicitly triggers an apply.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Offline, Deterministic Execution
+Operate without network access and rely solely on local variables/styles and document state. Handle missing collections, aliases, and unsupported node types gracefully with actionable status messages instead of crashes.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Lean UX & Performance
+Keep the UI responsive with light DOM work; filter/paginate instead of heavy re-renders on large selections. Status messaging should clearly report scan counts (found/missing/unsupported) and next actions.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Delivery Constraints
+Target runtime is Figma (desktop or browser) without experimental APIs. Color support is solid fills/strokes only until expanded; multi-fill/stroke handling and typography apply are follow-ups. Spacing apply is limited to auto layout padding/gaps and should not bind zero values. No persistent storage—state lives in-memory; never emit variable IDs outside plugin messaging.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Development Workflow & Quality Gates
+Toolchain: TypeScript with esbuild bundling to `dist/`; keep `src/ui.html` messaging in sync with `code.ts` statuses. Commands: `npm run build` for release bundles, `npm run watch` during development; ensure `manifest.json` points at built assets. Manual QA in Figma must cover scan of single/multi-node selections, apply tokens (fill/stroke/spacing), highlight/restore selection, and UI resize. Wrap Figma API calls to avoid uncaught errors; log to console for diagnosis. Update `README.md` when feature scope changes (strokes, spacing, typography apply) and record limitations here.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+This constitution guides DSLint behavior and developer decisions ahead of ad-hoc practices. Amendments require documenting rationale, updating version metadata, and noting migration or UX impacts. Reviews must check new features against the Core Principles and Delivery Constraints before merge.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.1 | **Ratified**: 2025-12-09 | **Last Amended**: 2025-12-09

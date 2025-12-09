@@ -16,13 +16,38 @@ const resolveNumericValue = async (variable: Variable) => {
   return null;
 };
 
+const EPSILON = 1e-5;
+export const DEFAULT_SPACING_TOLERANCE = 2;
+
 export const findSpacingVariable = async (value: number) => {
   const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
   for (const variable of vars) {
     const resolved = await resolveNumericValue(variable);
-    if (resolved !== null && Math.abs(resolved - value) < 1e-5) {
+    if (resolved !== null && Math.abs(resolved - value) < EPSILON) {
       return variable;
     }
+  }
+  return null;
+};
+
+export const findNearestSpacingVariable = async (
+  value: number,
+  tolerance: number = DEFAULT_SPACING_TOLERANCE
+) => {
+  const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
+  let best: { variable: Variable; diff: number } | null = null;
+
+  for (const variable of vars) {
+    const resolved = await resolveNumericValue(variable);
+    if (resolved === null) continue;
+    const diff = Math.abs(resolved - value);
+    if (best === null || diff < best.diff) {
+      best = { variable, diff };
+    }
+  }
+
+  if (best && best.diff <= tolerance) {
+    return best;
   }
   return null;
 };

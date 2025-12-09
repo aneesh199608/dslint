@@ -6,6 +6,7 @@ import {
   applyTypographyToNode,
   applyPaddingTokenToNode,
   applyGapTokenToNode,
+  applyCornerRadiusTokenToNode,
 } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
 import type { ModePreference } from "./types";
@@ -39,6 +40,8 @@ figma.ui.onmessage = async (msg) => {
         await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode));
       } else if (msg.target === "gap") {
         await applyGapTokenToNode(msg.nodeId, getMode(msg.mode));
+      } else if (msg.target === "cornerRadius") {
+        await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode));
       } else {
         await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
       }

@@ -323,6 +323,123 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
   });
 };
 
+export const applyCornerRadiusTokenToNode = async (
+  nodeId: string,
+  preferredModeName: ModePreference
+) => {
+  const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+  if (!node || !("cornerRadius" in node)) {
+    sendStatus({
+      title: "Unsupported selection",
+      message: "Corner radius apply works on nodes with corner radii.",
+      state: "error",
+    });
+    return;
+  }
+
+  const radiusValue = (node as any).cornerRadius;
+
+  const bindCorner = async (prop: string, variableId: string) => {
+    try {
+      (node as any).setBoundVariable?.(prop, { id: variableId, type: "VARIABLE_ALIAS" });
+    } catch {
+      // swallow binding errors
+    }
+  };
+
+  const applyVariable = async (variable: Variable) => {
+    if (radiusValue !== figma.mixed) {
+      // Uniform radius: bind to cornerRadius and to all corners for consistency.
+      bindCorner("cornerRadius", variable.id);
+      bindCorner("topLeftRadius", variable.id);
+      bindCorner("topRightRadius", variable.id);
+      bindCorner("bottomRightRadius", variable.id);
+      bindCorner("bottomLeftRadius", variable.id);
+    } else {
+      // Mixed radii: bind per-corner if present.
+      const corners = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"] as const;
+      for (const c of corners) {
+        const val = (node as any)[c];
+        if (typeof val === "number" && val > 0) {
+          bindCorner(c, variable.id);
+        }
+      }
+    }
+    sendStatus({
+      title: "Corner radius token applied",
+      message: `Applied corner radius token: ${variable.name}`,
+      state: "applied",
+    });
+  };
+
+  if (typeof radiusValue === "number") {
+    if (radiusValue <= 0) {
+      sendStatus({
+        title: "No corner radius tokens applied",
+        message: "Corner radius is 0; nothing to tokenize.",
+        state: "info",
+      });
+      return;
+    }
+
+    const match = await findSpacingVariable(radiusValue);
+    if (match) {
+      await applyVariable(match, "exact");
+      return;
+    }
+
+    sendStatus({
+      title: "No corner radius token found",
+      message: "No matching spacing token for this corner radius value.",
+      state: "info",
+    });
+    return;
+  }
+
+  if (radiusValue === figma.mixed) {
+    const corners = [
+      { prop: "topLeftRadius", value: (node as any).topLeftRadius },
+      { prop: "topRightRadius", value: (node as any).topRightRadius },
+      { prop: "bottomRightRadius", value: (node as any).bottomRightRadius },
+      { prop: "bottomLeftRadius", value: (node as any).bottomLeftRadius },
+    ];
+
+    const applicable = corners.filter((c) => typeof c.value === "number" && c.value > 0);
+    if (!applicable.length) {
+      sendStatus({
+        title: "No corner radius tokens applied",
+        message: "Corner radius values are 0; nothing to tokenize.",
+        state: "info",
+      });
+      return;
+    }
+
+    let appliedAny = false;
+    for (const c of applicable) {
+      const match = await findSpacingVariable(c.value as number);
+      if (match) {
+        await bindCorner(c.prop, match.id);
+        appliedAny = true;
+      }
+    }
+
+    if (appliedAny) {
+      sendStatus({
+        title: "Corner radius token applied",
+        message: "Applied corner radius tokens to available corners.",
+        state: "applied",
+      });
+    } else {
+      sendStatus({
+        title: "No corner radius token found",
+        message: "No matching spacing tokens for corner radius values.",
+        state: "info",
+      });
+    }
+    return;
+  }
+};
+
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
   opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean }
@@ -342,6 +459,9 @@ export const applyAllMissing = async (
     }
     if (opts?.spacing !== false && item.gap?.state === "missing") {
       await applyGapTokenToNode(item.id, preferredModeName);
+    }
+    if (opts?.spacing !== false && item.cornerRadius?.state === "missing") {
+      await applyCornerRadiusTokenToNode(item.id, preferredModeName);
     }
   }
 
