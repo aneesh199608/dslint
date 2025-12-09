@@ -37,8 +37,15 @@ const evalPaint = async (
     };
   }
 
-  const bound = first.boundVariables?.color;
-  const boundId = typeof bound === "string" ? bound : bound?.id;
+  // Try to detect a bound variable from the paint itself or the node-level binding.
+  const nodeBound = (node as any).boundVariables;
+  const paintBinding = first.boundVariables?.color;
+  const paintBindingId = typeof paintBinding === "string" ? paintBinding : paintBinding?.id;
+  const nodePaintBound =
+    kind === "fill"
+      ? nodeBound?.fills?.[0]?.color?.id ?? nodeBound?.fills?.[0]?.id
+      : nodeBound?.strokes?.[0]?.color?.id ?? nodeBound?.strokes?.[0]?.id;
+  const boundId = paintBindingId ?? nodePaintBound;
 
   if (boundId) {
     const variable = await figma.variables.getVariableByIdAsync(boundId);
@@ -52,11 +59,46 @@ const evalPaint = async (
     };
   }
 
+  const styleId =
+    kind === "fill" ? (node as any).fillStyleId : (node as any).strokeStyleId;
+  if (styleId && styleId !== figma.mixed) {
+    try {
+      const style = await figma.getStyleByIdAsync(styleId as string);
+      const styleName = style?.name ?? "Color style";
+      return {
+        kind,
+        message: `Using style: ${styleName}`,
+        state: "found",
+        variableName: styleName,
+      };
+    } catch (err) {
+      return {
+        kind,
+        message: "Using color style",
+        state: "found",
+      };
+    }
+  }
+
+  const opacity = typeof first.opacity === "number" ? first.opacity : 1;
+  // Use raw paint color for display so very low opacities still show the intended token tint.
   const hex = rgbToHex(first.color);
+  const percent = opacity * 100;
+  // Show very small opacities with a bit more precision so 0.1% does not show as 0.00%.
+  const opacityDisplay =
+    opacity !== 1
+      ? ` @${
+          percent >= 1
+            ? percent.toFixed(1)
+            : percent >= 0.1
+            ? percent.toPrecision(3)
+            : percent.toPrecision(2)
+        }%`
+      : "";
 
   return {
     kind,
-    message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex} is not using a variable.`,
+      message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex}${opacityDisplay} is not using a variable.`,
     state: "missing",
     hex,
   };

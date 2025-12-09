@@ -1,5 +1,5 @@
 import { sendStatus } from "./messages";
-import { findNearestColorVariable } from "./variables";
+import { findNearestColorVariable, resolveColorForMode } from "./variables";
 import { scanSelection } from "./scanner";
 import { findMatchingTypographyVariable, findNumericVariableMatch } from "./typography";
 import { findSpacingVariable } from "./spacing";
@@ -52,7 +52,12 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
-  const nearestVariable = await findNearestColorVariable(first.color, preferredModeName);
+  const paintOpacity = typeof first.opacity === "number" ? first.opacity : 1;
+  const nearestVariable = await findNearestColorVariable(
+    first.color,
+    paintOpacity,
+    preferredModeName
+  );
 
   if (!nearestVariable) {
     sendStatus({
@@ -63,8 +68,37 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
+  // If already bound to this variable, bail early.
+  const alreadyBound =
+    (typeof first.boundVariables?.color === "string"
+      ? first.boundVariables?.color
+      : first.boundVariables?.color?.id) === nearestVariable.id;
+
+  if (alreadyBound) {
+    sendStatus({
+      title: "Already applied",
+      message: "This color is already bound to that token.",
+      state: "info",
+    });
+    return;
+  }
+
+  const resolved = await resolveColorForMode(nearestVariable, preferredModeName);
+  const variableAlpha = resolved?.a ?? 1;
+
+  // If the token carries alpha, use it directly (not multiplied by the existing paint opacity).
+  // Otherwise, preserve the existing paint opacity.
+  const nextOpacity = variableAlpha < 1 ? variableAlpha : paintOpacity;
+
+  const nextColor =
+    resolved != null
+      ? { r: resolved.r, g: resolved.g, b: resolved.b }
+      : first.color;
+
   const updatedPaint: SolidPaint = {
     ...first,
+    color: nextColor,
+    opacity: nextOpacity,
     boundVariables: {
       ...(first.boundVariables ?? {}),
       color: { id: nearestVariable.id, type: "VARIABLE_ALIAS" },
@@ -72,10 +106,53 @@ export const applyNearestTokenToNode = async (
   };
 
   if (target === "fill") {
+    // Clear conflicting style id if present.
+    const setFillStyleIdAsync = (node as any).setFillStyleIdAsync;
+    if (typeof setFillStyleIdAsync === "function") {
+      try {
+        await setFillStyleIdAsync.call(node, "");
+      } catch {
+        // Ignore failures; continue with applying the paint + binding.
+      }
+    }
     (node as GeometryMixin).fills = [updatedPaint];
+    // Also bind explicitly so node.boundVariables reflects the change immediately.
+    try {
+      (node as any).setBoundVariable?.("fills/0/color", {
+        id: nearestVariable.id,
+        type: "VARIABLE_ALIAS",
+      });
+    } catch {
+      // Swallow; the paint-level boundVariables above still applies the token.
+    }
   } else {
+    const setStrokeStyleIdAsync = (node as any).setStrokeStyleIdAsync;
+    if (typeof setStrokeStyleIdAsync === "function") {
+      try {
+        await setStrokeStyleIdAsync.call(node, "");
+      } catch {
+        // Ignore failures; continue with applying the paint + binding.
+      }
+    }
     (node as GeometryMixin).strokes = [updatedPaint];
+    try {
+      (node as any).setBoundVariable?.("strokes/0/color", {
+        id: nearestVariable.id,
+        type: "VARIABLE_ALIAS",
+      });
+    } catch {
+      // Ignore; paint-level binding remains.
+    }
   }
+
+  sendStatus({
+    title: "Token applied",
+    message: `Applied ${target} token: ${nearestVariable.name}`,
+    state: "applied",
+  });
+
+  // Refresh UI so the row updates to "Using variable" after apply.
+  await scanSelection(preferredModeName);
 };
 
 export const applyPaddingTokenToNode = async (
