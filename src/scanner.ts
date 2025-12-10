@@ -12,6 +12,7 @@ import type {
   TypographyInfo,
   PaddingInfo,
   GapInfo,
+  StrokeWeightInfo,
   CornerRadiusInfo,
 } from "./types";
 
@@ -110,11 +111,17 @@ const computeOverallState = (
   stroke?: PaintInfo | null,
   padding?: PaddingInfo | null,
   gap?: GapInfo | null,
+  strokeWeight?: StrokeWeightInfo | null,
   cornerRadius?: CornerRadiusInfo | null
 ): StatusState => {
-  const states = [fill?.state, stroke?.state, padding?.state, gap?.state, cornerRadius?.state].filter(
-    Boolean
-  ) as StatusState[];
+  const states = [
+    fill?.state,
+    stroke?.state,
+    padding?.state,
+    gap?.state,
+    strokeWeight?.state,
+    cornerRadius?.state,
+  ].filter(Boolean) as StatusState[];
   if (states.some((s) => s === "missing")) return "missing";
   if (states.some((s) => s === "error")) return "error";
   if (states.some((s) => s === "found" || s === "applied")) return "found";
@@ -144,6 +151,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     let typography: TypographyInfo | undefined;
     let padding: PaddingInfo | undefined;
     let gap: GapInfo | undefined;
+    let strokeWeightInfo: StrokeWeightInfo | undefined;
     let cornerRadius: CornerRadiusInfo | undefined;
 
     if (node.type === "TEXT") {
@@ -255,7 +263,98 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
                 variableName: match.name,
               };
             } else {
-          gap = { message: "Gap has no matching token", state: "info" };
+              gap = { message: "Gap has no matching token", state: "info" };
+            }
+          }
+        }
+      }
+    }
+
+    if ("strokeWeight" in node) {
+      const weight = (node as any).strokeWeight;
+      const strokes = (node as GeometryMixin).strokes;
+      const bound = (node as any).boundVariables;
+      const strokeEntry =
+        strokes && strokes !== figma.mixed && strokes[0] && typeof strokes[0] === "object"
+          ? (strokes[0] as any)
+          : null;
+      const strokeWeightAlias =
+        strokeEntry && typeof strokeEntry.weight === "object" && "type" in strokeEntry.weight
+          ? strokeEntry.weight
+          : null;
+
+      const candidateIds: (string | undefined)[] = [
+        typeof bound?.strokeWeight === "string" ? bound.strokeWeight : bound?.strokeWeight?.id,
+        typeof bound?.strokes?.[0]?.weight === "string"
+          ? (bound?.strokes?.[0]?.weight as string)
+          : bound?.strokes?.[0]?.weight?.id,
+        strokeWeightAlias?.type === "VARIABLE_ALIAS" ? strokeWeightAlias.id : undefined,
+        typeof strokeEntry?.boundVariables?.weight === "string"
+          ? (strokeEntry?.boundVariables?.weight as string)
+          : strokeEntry?.boundVariables?.weight?.id,
+        typeof bound?.strokes?.[0] === "string"
+          ? (bound?.strokes?.[0] as string)
+          : bound?.strokes?.[0]?.id, // consider if stroke-level binding is a FLOAT variable
+        typeof bound?.["strokes/0/weight"] === "string"
+          ? (bound?.["strokes/0/weight"] as string)
+          : (bound?.["strokes/0/weight"] as any)?.id,
+        typeof strokeEntry?.boundVariables?.strokeWeight === "string"
+          ? (strokeEntry?.boundVariables?.strokeWeight as string)
+          : strokeEntry?.boundVariables?.strokeWeight?.id,
+      ];
+
+      const hasBoundAlias =
+        candidateIds.some(Boolean) || strokeWeightAlias?.type === "VARIABLE_ALIAS";
+
+      let boundWeightVariable: Variable | null = null;
+      let boundWeightVariableName: string | undefined;
+      for (const cid of candidateIds) {
+        if (!cid) continue;
+        try {
+          const variable = await figma.variables.getVariableByIdAsync(cid);
+          if (variable && variable.resolvedType === "FLOAT") {
+            boundWeightVariable = variable;
+            boundWeightVariableName = variable.name;
+            break;
+          }
+        } catch {
+          // ignore lookup errors; fall back to alias detection
+        }
+      }
+
+      if (!strokes || strokes === figma.mixed || strokes.length === 0) {
+        // No usable strokes; show info only if weight > 0.
+        if (typeof weight === "number" && weight > 0) {
+          strokeWeightInfo = { message: "Stroke present but unsupported stroke list", state: "info" };
+        }
+      } else {
+        const firstStroke = strokes[0];
+        if (firstStroke.type !== "SOLID") {
+          strokeWeightInfo = { message: "Stroke weight unsupported (non-solid stroke)", state: "info" };
+        } else if (boundWeightVariable || hasBoundAlias) {
+          strokeWeightInfo = {
+            message: `Stroke weight using variable${boundWeightVariableName ? `: ${boundWeightVariableName}` : ""}`,
+            state: "found",
+            variableName: boundWeightVariableName,
+          };
+        } else if (typeof weight === "number") {
+          if (isZero(weight)) {
+            strokeWeightInfo = undefined;
+          } else {
+            const match = await findSpacingVariable(weight);
+            if (match) {
+              strokeWeightInfo = {
+                message: `Stroke weight matches token ${match.name}`,
+                state: "missing",
+                variableName: match.name,
+              };
+            } else {
+              strokeWeightInfo = {
+                message: "Stroke weight has no matching token",
+                state: "info",
+              };
+            }
+          }
         }
       }
     }
@@ -355,12 +454,11 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         }
       }
     }
-      }
-    }
 
-    if (!fill && !stroke && !typography && !padding && !gap && !cornerRadius) continue;
+    if (!fill && !stroke && !typography && !padding && !gap && !strokeWeightInfo && !cornerRadius)
+      continue;
 
-    const state = computeOverallState(fill, stroke, padding, gap, cornerRadius);
+    const state = computeOverallState(fill, stroke, padding, gap, strokeWeightInfo, cornerRadius);
 
     results.push({
       id: node.id,
@@ -371,6 +469,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       typography,
       padding,
       gap,
+      strokeWeight: strokeWeightInfo,
       cornerRadius,
     });
   }

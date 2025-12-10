@@ -34,6 +34,12 @@ export type GapInfo = {
   variableName?: string;
 };
 
+export type StrokeWeightInfo = {
+  message: string;
+  state: StatusState;
+  variableName?: string;
+};
+
 export type CornerRadiusInfo = {
   message: string;
   state: StatusState;
@@ -49,5 +55,6 @@ export type NodeScanResult = {
   typography?: TypographyInfo;
   padding?: PaddingInfo;
   gap?: GapInfo;
+  strokeWeight?: StrokeWeightInfo;
   cornerRadius?: CornerRadiusInfo;
 };

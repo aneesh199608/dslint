@@ -243,6 +243,9 @@
             const gapStatus = item.gap
               ? `<div style="font-size:12px;color:${item.gap.state === "missing" ? "#b91c1c" : "#475569"};">Gap: ${item.gap.message}</div>`
               : "";
+            const borderStatus = item.strokeWeight
+              ? `<div style="font-size:12px;color:${item.strokeWeight.state === "missing" ? "#b91c1c" : "#475569"};">Stroke weight: ${item.strokeWeight.message}</div>`
+              : "";
             const radiusStatus = item.cornerRadius
               ? `<div style="font-size:12px;color:${item.cornerRadius.state === "missing" ? "#b91c1c" : "#475569"};">Corner radius: ${item.cornerRadius.message}</div>`
               : "";
@@ -266,6 +269,10 @@
               item.gap?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="gap" class="row-apply">Apply Gap Token</button>`
                 : "";
+            const borderBtn =
+              item.strokeWeight?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="strokeWeight" class="row-apply">Apply Stroke Weight Token</button>`
+                : "";
             const radiusBtn =
               item.cornerRadius?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="cornerRadius" class="row-apply">Apply Corner Radius Token</button>`
@@ -274,7 +281,7 @@
               ? `<button data-id="${item.id}" data-target="typography" class="row-apply" disabled title="Typography apply coming soon" style="opacity:0.5;cursor:not-allowed;">Apply Typography Token</button>`
               : "";
 
-            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${radiusBtn}${typoBtn}</div>`;
+            const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${borderBtn}${radiusBtn}${typoBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
               <div>
                 <div style="font-weight:600;font-size:12px;">${item.name || "Layer"}</div>
@@ -282,6 +289,7 @@
                 ${strokeStatus || ""}
                 ${paddingStatus || ""}
                 ${gapStatus || ""}
+                ${borderStatus || ""}
                 ${radiusStatus || ""}
                 ${typoStatus || ""}
               </div>
