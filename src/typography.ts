@@ -9,6 +9,14 @@ type TypographyValue = {
 
 const isTextNode = (node: SceneNode): node is TextNode => node.type === "TEXT";
 
+const normalizeLineHeight = (lineHeight?: LineHeight): TypographyValue["lineHeight"] => {
+  if (!lineHeight) return undefined;
+  if (lineHeight.unit === "AUTO") {
+    return { unit: "AUTO" };
+  }
+  return { unit: lineHeight.unit, value: lineHeight.value };
+};
+
 const getNodeTypography = (node: TextNode): TypographyValue | null => {
   // Only handle uniform text styling for now.
   if (node.hasMissingFont) return null;
@@ -23,12 +31,7 @@ const getNodeTypography = (node: TextNode): TypographyValue | null => {
     fontFamily: fontName.family,
     fontStyle: fontName.style,
     fontSize: node.fontSize as number,
-    lineHeight: lineHeight
-      ? {
-          unit: lineHeight.unit,
-          value: lineHeight.value,
-        }
-      : undefined,
+    lineHeight: normalizeLineHeight(lineHeight),
   };
 };
 
@@ -43,6 +46,13 @@ const typographyEqual = (a: TypographyValue, b: TypographyValue) => {
     a.fontSize === b.fontSize &&
     lhEqual
   );
+};
+
+const getDefaultModeIdForVariable = async (variable: Variable) => {
+  const collection = await figma.variables.getVariableCollectionByIdAsync(
+    variable.variableCollectionId
+  );
+  return collection?.defaultModeId ?? collection?.modes?.[0]?.modeId;
 };
 
 export const findMatchingTypographyVariable = async (
@@ -61,9 +71,7 @@ export const findMatchingTypographyVariable = async (
       fontFamily: style.fontName.family,
       fontStyle: style.fontName.style,
       fontSize: style.fontSize,
-      lineHeight: style.lineHeight
-        ? { unit: style.lineHeight.unit, value: style.lineHeight.value }
-        : undefined,
+      lineHeight: normalizeLineHeight(style.lineHeight as LineHeight | undefined),
     };
     if (typographyEqual(nodeTypos, styleValue)) {
       return { variable: style, value: styleValue, isStyle: true };
@@ -79,7 +87,7 @@ export const findNumericVariableMatch = async (
 ) => {
   const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
   for (const variable of vars) {
-    const modeId = variable.defaultModeId ?? variable.modes?.[0]?.modeId;
+    const modeId = await getDefaultModeIdForVariable(variable);
     if (!modeId) continue;
     const v = variable.valuesByMode[modeId];
     if (typeof v === "number" && Math.abs(v - value) < 1e-5) {

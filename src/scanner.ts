@@ -24,8 +24,7 @@ const evalPaint = async (
   preferredModeName: ModePreference
 ): Promise<PaintInfo | null> => {
   const paints = kind === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
-  if (!paints) return null;
-  if (paints === figma.mixed || paints.length === 0) {
+  if (!Array.isArray(paints) || paints.length === 0) {
     return null;
   }
 
@@ -158,7 +157,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       const match = await findMatchingTypographyVariable(node, preferredModeName);
       const boundId = node.textStyleId;
 
-      if (boundId) {
+      if (boundId && boundId !== figma.mixed) {
         try {
           const style = await figma.getStyleByIdAsync(boundId);
           typography = {
@@ -189,10 +188,11 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     if ("paddingLeft" in node) {
       const layoutMode = (node as any).layoutMode;
       const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
-      const pl = (node as LayoutMixin).paddingLeft;
-      const pr = (node as LayoutMixin).paddingRight;
-      const pt = (node as LayoutMixin).paddingTop;
-      const pb = (node as LayoutMixin).paddingBottom;
+      const layoutNode = node as AutoLayoutMixin;
+      const pl = layoutNode.paddingLeft;
+      const pr = layoutNode.paddingRight;
+      const pt = layoutNode.paddingTop;
+      const pb = layoutNode.paddingBottom;
       const bound = (node as any).boundVariables;
       const sides = [
         { value: pl, bound: bound?.paddingLeft?.id, label: "L" },
@@ -241,7 +241,8 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     if ("itemSpacing" in node && "layoutMode" in node) {
       const layoutMode = (node as any).layoutMode;
       const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
-      const spacing = (node as LayoutMixin).itemSpacing;
+      const autoNode = node as AutoLayoutMixin;
+      const spacing = autoNode.itemSpacing as number | "AUTO" | "Auto";
       const primaryAxisAlign = (node as any).primaryAxisAlignItems;
       const usesAutoGap =
         spacing === "AUTO" ||
@@ -286,7 +287,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       const strokes = (node as GeometryMixin).strokes;
       const bound = (node as any).boundVariables;
       const strokeEntry =
-        strokes && strokes !== figma.mixed && strokes[0] && typeof strokes[0] === "object"
+        Array.isArray(strokes) && strokes[0] && typeof strokes[0] === "object"
           ? (strokes[0] as any)
           : null;
       const strokeWeightAlias =
@@ -333,7 +334,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         }
       }
 
-      if (!strokes || strokes === figma.mixed || strokes.length === 0) {
+      if (!Array.isArray(strokes) || strokes.length === 0) {
         // No usable strokes; show info only if weight > 0.
         if (typeof weight === "number" && weight > 0) {
           strokeWeightInfo = { message: "Stroke present but unsupported stroke list", state: "info" };

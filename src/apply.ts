@@ -4,7 +4,6 @@ import { scanSelection } from "./scanner";
 import { findMatchingTypographyVariable, findNumericVariableMatch } from "./typography";
 import { findSpacingVariable } from "./spacing";
 import type { ModePreference } from "./types";
-import type { SolidPaint } from "@figma/plugin-typings";
 
 export const applyNearestTokenToNode = async (
   nodeId: string,
@@ -23,7 +22,7 @@ export const applyNearestTokenToNode = async (
 
   const paints = target === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
 
-  if (!paints) {
+  if (!Array.isArray(paints)) {
     sendStatus({
       title: "Unsupported selection",
       message: `Select a node that supports ${target}s.`,
@@ -32,7 +31,7 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
-  if (paints === figma.mixed || paints.length === 0) {
+  if (paints.length === 0) {
     sendStatus({
       title: `No ${target} detected`,
       message: `Add a solid ${target} to apply a color token.`,
@@ -118,10 +117,7 @@ export const applyNearestTokenToNode = async (
     (node as GeometryMixin).fills = [updatedPaint];
     // Also bind explicitly so node.boundVariables reflects the change immediately.
     try {
-      (node as any).setBoundVariable?.("fills/0/color", {
-        id: nearestVariable.id,
-        type: "VARIABLE_ALIAS",
-      });
+      (node as any).setBoundVariable?.("fills/0/color", nearestVariable.id);
     } catch {
       // Swallow; the paint-level boundVariables above still applies the token.
     }
@@ -136,10 +132,7 @@ export const applyNearestTokenToNode = async (
     }
     (node as GeometryMixin).strokes = [updatedPaint];
     try {
-      (node as any).setBoundVariable?.("strokes/0/color", {
-        id: nearestVariable.id,
-        type: "VARIABLE_ALIAS",
-      });
+      (node as any).setBoundVariable?.("strokes/0/color", nearestVariable.id);
     } catch {
       // Ignore; paint-level binding remains.
     }
@@ -169,10 +162,11 @@ export const applyPaddingTokenToNode = async (
     return;
   }
 
-  const pl = (node as LayoutMixin).paddingLeft;
-  const pr = (node as LayoutMixin).paddingRight;
-  const pt = (node as LayoutMixin).paddingTop;
-  const pb = (node as LayoutMixin).paddingBottom;
+  const layoutNode = node as AutoLayoutMixin;
+  const pl = layoutNode.paddingLeft;
+  const pr = layoutNode.paddingRight;
+  const pt = layoutNode.paddingTop;
+  const pb = layoutNode.paddingBottom;
 
   const allZero = pl === 0 && pr === 0 && pt === 0 && pb === 0;
   if (allZero) {
@@ -204,10 +198,10 @@ export const applyPaddingTokenToNode = async (
       return;
     }
 
-    node.setBoundVariable("paddingLeft", { id: match.id, type: "VARIABLE_ALIAS" });
-    node.setBoundVariable("paddingRight", { id: match.id, type: "VARIABLE_ALIAS" });
-    node.setBoundVariable("paddingTop", { id: match.id, type: "VARIABLE_ALIAS" });
-    node.setBoundVariable("paddingBottom", { id: match.id, type: "VARIABLE_ALIAS" });
+    node.setBoundVariable("paddingLeft", match);
+    node.setBoundVariable("paddingRight", match);
+    node.setBoundVariable("paddingTop", match);
+    node.setBoundVariable("paddingBottom", match);
     sendStatus({
       title: "Padding token applied",
       message: `Applied padding token: ${match.name}`,
@@ -230,12 +224,12 @@ export const applyPaddingTokenToNode = async (
     }
 
     if (hVar) {
-      node.setBoundVariable("paddingLeft", { id: hVar.id, type: "VARIABLE_ALIAS" });
-      node.setBoundVariable("paddingRight", { id: hVar.id, type: "VARIABLE_ALIAS" });
+      node.setBoundVariable("paddingLeft", hVar);
+      node.setBoundVariable("paddingRight", hVar);
     }
     if (vVar) {
-      node.setBoundVariable("paddingTop", { id: vVar.id, type: "VARIABLE_ALIAS" });
-      node.setBoundVariable("paddingBottom", { id: vVar.id, type: "VARIABLE_ALIAS" });
+      node.setBoundVariable("paddingTop", vVar);
+      node.setBoundVariable("paddingBottom", vVar);
     }
     sendStatus({
       title: "Padding tokens applied",
@@ -260,10 +254,10 @@ export const applyPaddingTokenToNode = async (
     return;
   }
 
-  if (topVar) node.setBoundVariable("paddingTop", { id: topVar.id, type: "VARIABLE_ALIAS" });
-  if (rightVar) node.setBoundVariable("paddingRight", { id: rightVar.id, type: "VARIABLE_ALIAS" });
-  if (bottomVar) node.setBoundVariable("paddingBottom", { id: bottomVar.id, type: "VARIABLE_ALIAS" });
-  if (leftVar) node.setBoundVariable("paddingLeft", { id: leftVar.id, type: "VARIABLE_ALIAS" });
+  if (topVar) node.setBoundVariable("paddingTop", topVar);
+  if (rightVar) node.setBoundVariable("paddingRight", rightVar);
+  if (bottomVar) node.setBoundVariable("paddingBottom", bottomVar);
+  if (leftVar) node.setBoundVariable("paddingLeft", leftVar);
 
   sendStatus({
     title: "Padding tokens applied",
@@ -294,7 +288,8 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
     return;
   }
 
-  const spacing = (node as LayoutMixin).itemSpacing;
+  const layoutNode = node as AutoLayoutMixin;
+  const spacing = layoutNode.itemSpacing as number | "AUTO" | "Auto";
   const primaryAxisAlign = (node as any).primaryAxisAlignItems;
   const usesAutoGap =
     spacing === "AUTO" ||
@@ -330,7 +325,7 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
     return;
   }
 
-  (node as any).setBoundVariable("itemSpacing", { id: match.id, type: "VARIABLE_ALIAS" });
+  (node as any).setBoundVariable("itemSpacing", match);
 
   sendStatus({
     title: "Gap token applied",
@@ -354,7 +349,7 @@ export const applyStrokeWeightTokenToNode = async (
   }
 
   const strokes = (node as GeometryMixin).strokes;
-  if (!strokes || strokes === figma.mixed || strokes.length === 0) {
+  if (!Array.isArray(strokes) || strokes.length === 0) {
     sendStatus({
       title: "No stroke weight applied",
       message: "No strokes detected to tokenize.",
@@ -405,7 +400,7 @@ export const applyStrokeWeightTokenToNode = async (
 
   // Attempt to bind at node-level and per-stroke path for robustness.
   try {
-    (node as any).setBoundVariable?.("strokeWeight", { id: match.id, type: "VARIABLE_ALIAS" });
+    (node as any).setBoundVariable?.("strokeWeight", match.id);
   } catch {
     // ignore binding errors
   }
@@ -414,14 +409,14 @@ export const applyStrokeWeightTokenToNode = async (
   for (const prop of sideProps) {
     if (prop in (node as any)) {
       try {
-        (node as any).setBoundVariable?.(prop, { id: match.id, type: "VARIABLE_ALIAS" });
+        (node as any).setBoundVariable?.(prop, match.id);
       } catch {
         // ignore per-side binding errors
       }
     }
   }
   try {
-    (node as any).setBoundVariable?.("strokes/0/weight", { id: match.id, type: "VARIABLE_ALIAS" });
+    (node as any).setBoundVariable?.("strokes/0/weight", match.id);
   } catch {
     // ignore binding errors; node-level binding may still work
   }
@@ -502,7 +497,7 @@ export const applyCornerRadiusTokenToNode = async (
 
   const bindCorner = async (prop: string, variableId: string) => {
     try {
-      (node as any).setBoundVariable?.(prop, { id: variableId, type: "VARIABLE_ALIAS" });
+      (node as any).setBoundVariable?.(prop, variableId);
     } catch {
       // swallow binding errors
     }
@@ -545,7 +540,7 @@ export const applyCornerRadiusTokenToNode = async (
 
     const match = await findSpacingVariable(radiusValue);
     if (match) {
-      await applyVariable(match, "exact");
+      await applyVariable(match);
       return;
     }
 
