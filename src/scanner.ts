@@ -242,7 +242,18 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
       const layoutMode = (node as any).layoutMode;
       const isAutoLayout = layoutMode === "HORIZONTAL" || layoutMode === "VERTICAL";
       const spacing = (node as LayoutMixin).itemSpacing;
-      if (!isZero(spacing)) {
+      const primaryAxisAlign = (node as any).primaryAxisAlignItems;
+      const usesAutoGap =
+        spacing === "AUTO" ||
+        spacing === "Auto" ||
+        primaryAxisAlign === "SPACE_BETWEEN" ||
+        primaryAxisAlign === "AUTO";
+
+      if (usesAutoGap) {
+        gap = { message: "Gap uses Auto spacing (not tokenized)", state: "info" };
+      } else if (typeof spacing !== "number") {
+        gap = { message: "Gap spacing not numeric (not tokenized)", state: "info" };
+      } else if (!isZero(spacing)) {
         if (!isAutoLayout) {
           gap = { message: "Gap present (auto layout off)", state: "info" };
         } else {

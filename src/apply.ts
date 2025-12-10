@@ -295,7 +295,23 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
   }
 
   const spacing = (node as LayoutMixin).itemSpacing;
-  if (!spacing || spacing <= 0) {
+  const primaryAxisAlign = (node as any).primaryAxisAlignItems;
+  const usesAutoGap =
+    spacing === "AUTO" ||
+    spacing === "Auto" ||
+    primaryAxisAlign === "SPACE_BETWEEN" ||
+    primaryAxisAlign === "AUTO";
+
+  if (usesAutoGap) {
+    sendStatus({
+      title: "No gap token applied",
+      message: "Gap uses Auto spacing; leaving unchanged.",
+      state: "info",
+    });
+    return;
+  }
+
+  if (typeof spacing !== "number" || spacing <= 0) {
     sendStatus({
       title: "No gap token applied",
       message: "Gap is 0; nothing to tokenize.",
