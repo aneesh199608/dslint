@@ -20,6 +20,7 @@ export type TypographyInfo = {
   message: string;
   state: StatusState;
   variableName?: string;
+  styleId?: string;
 };
 
 export type PaddingInfo = {

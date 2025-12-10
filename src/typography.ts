@@ -5,9 +5,12 @@ type TypographyValue = {
   fontSize?: number;
   fontStyle?: string;
   lineHeight?: { unit: "PIXELS" | "PERCENT" | "AUTO"; value?: number };
+  letterSpacing?: { unit: "PIXELS" | "PERCENT"; value: number };
 };
 
 const isTextNode = (node: SceneNode): node is TextNode => node.type === "TEXT";
+
+const nearlyEqual = (a?: number, b?: number) => Math.abs((a ?? 0) - (b ?? 0)) < 0.0001;
 
 const normalizeLineHeight = (lineHeight?: LineHeight): TypographyValue["lineHeight"] => {
   if (!lineHeight) return undefined;
@@ -17,35 +20,101 @@ const normalizeLineHeight = (lineHeight?: LineHeight): TypographyValue["lineHeig
   return { unit: lineHeight.unit, value: lineHeight.value };
 };
 
-const getNodeTypography = (node: TextNode): TypographyValue | null => {
-  // Only handle uniform text styling for now.
-  if (node.hasMissingFont) return null;
-  if (node.fontName === figma.mixed) return null;
-  if (node.fontSize === figma.mixed) return null;
-  if (node.lineHeight === figma.mixed) return null;
-
-  const fontName = node.fontName as FontName;
-  const lineHeight = node.lineHeight as LineHeight | undefined;
-
+const normalizeLetterSpacing = (
+  letterSpacing?: LetterSpacing
+): TypographyValue["letterSpacing"] => {
+  if (!letterSpacing) {
+    return { unit: "PERCENT", value: 0 };
+  }
   return {
-    fontFamily: fontName.family,
-    fontStyle: fontName.style,
-    fontSize: node.fontSize as number,
-    lineHeight: normalizeLineHeight(lineHeight),
+    unit: letterSpacing.unit,
+    value: letterSpacing.value ?? 0,
   };
 };
 
 const typographyEqual = (a: TypographyValue, b: TypographyValue) => {
-  const lhEqual =
-    (a.lineHeight?.unit ?? "AUTO") === (b.lineHeight?.unit ?? "AUTO") &&
-    (a.lineHeight?.value ?? 0) === (b.lineHeight?.value ?? 0);
+  const lhA = a.lineHeight ?? { unit: "AUTO" as const };
+  const lhB = b.lineHeight ?? { unit: "AUTO" as const };
+  const lsA = a.letterSpacing ?? { unit: "PERCENT" as const, value: 0 };
+  const lsB = b.letterSpacing ?? { unit: "PERCENT" as const, value: 0 };
+  const lhEqual = lhA.unit === lhB.unit && nearlyEqual(lhA.value, lhB.value);
+  const lsEqual = lsA.unit === lsB.unit && nearlyEqual(lsA.value, lsB.value);
 
   return (
     a.fontFamily === b.fontFamily &&
     a.fontStyle === b.fontStyle &&
-    a.fontSize === b.fontSize &&
-    lhEqual
+    nearlyEqual(a.fontSize, b.fontSize) &&
+    lhEqual &&
+    lsEqual
   );
+};
+
+const getTypographyForRange = (node: TextNode, start: number, end: number) => {
+  try {
+    const fontName = node.getRangeFontName(start, end);
+    const fontSize = node.getRangeFontSize(start, end);
+    const lineHeight = node.getRangeLineHeight(start, end);
+    const letterSpacing = node.getRangeLetterSpacing(start, end);
+
+    if (
+      fontName === figma.mixed ||
+      fontSize === figma.mixed ||
+      lineHeight === figma.mixed ||
+      letterSpacing === figma.mixed
+    ) {
+      return null;
+    }
+
+    return {
+      fontFamily: (fontName as FontName).family,
+      fontStyle: (fontName as FontName).style,
+      fontSize: fontSize as number,
+      lineHeight: normalizeLineHeight(lineHeight as LineHeight | undefined),
+      letterSpacing: normalizeLetterSpacing(letterSpacing as LetterSpacing | undefined),
+    } as TypographyValue;
+  } catch (err) {
+    return null;
+  }
+};
+
+const getNodeTypography = (node: TextNode): { value?: TypographyValue; reason?: string } => {
+  if (node.hasMissingFont) return { reason: "Missing fonts; typography not checked." };
+  const len = node.characters?.length ?? 0;
+  if (len === 0) return { reason: "Empty text node; nothing to tokenize." };
+
+  const base: TypographyValue | null =
+    node.fontName !== figma.mixed &&
+    node.fontSize !== figma.mixed &&
+    node.lineHeight !== figma.mixed &&
+    node.letterSpacing !== figma.mixed
+      ? {
+          fontFamily: (node.fontName as FontName).family,
+          fontStyle: (node.fontName as FontName).style,
+          fontSize: node.fontSize as number,
+          lineHeight: normalizeLineHeight(node.lineHeight as LineHeight | undefined),
+          letterSpacing: normalizeLetterSpacing(node.letterSpacing as LetterSpacing | undefined),
+        }
+      : getTypographyForRange(node, 0, 1);
+
+  if (!base) return { reason: "Unsupported typography values (mixed styles)." };
+
+  const isMixed =
+    node.fontName === figma.mixed ||
+    node.fontSize === figma.mixed ||
+    node.lineHeight === figma.mixed ||
+    node.letterSpacing === figma.mixed;
+
+  if (isMixed) {
+    for (let i = 1; i < len; i++) {
+      const rangeValue = getTypographyForRange(node, i, i + 1);
+      if (!rangeValue) return { reason: "Mixed typography styles; not tokenized." };
+      if (!typographyEqual(base, rangeValue)) {
+        return { reason: "Mixed typography styles; not tokenized." };
+      }
+    }
+  }
+
+  return { value: base };
 };
 
 const getDefaultModeIdForVariable = async (variable: Variable) => {
@@ -57,11 +126,12 @@ const getDefaultModeIdForVariable = async (variable: Variable) => {
 
 export const findMatchingTypographyVariable = async (
   node: SceneNode,
-  _preferredModeName: ModePreference
+  _preferredModeName: ModePreference,
+  override?: TypographyValue
 ) => {
   if (!isTextNode(node)) return null;
 
-  const nodeTypos = getNodeTypography(node);
+  const nodeTypos = override ?? getNodeTypography(node).value;
   if (!nodeTypos) return null;
 
   // Fallback to text styles since typography variables are not supported in this environment.
@@ -72,6 +142,7 @@ export const findMatchingTypographyVariable = async (
       fontStyle: style.fontName.style,
       fontSize: style.fontSize,
       lineHeight: normalizeLineHeight(style.lineHeight as LineHeight | undefined),
+      letterSpacing: normalizeLetterSpacing(style.letterSpacing as LetterSpacing | undefined),
     };
     if (typographyEqual(nodeTypos, styleValue)) {
       return { variable: style, value: styleValue, isStyle: true };
@@ -101,6 +172,58 @@ export const applyTypographyVariable = async (nodeId: string, variableId: string
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || node.type !== "TEXT") return false;
 
-  node.textStyleId = variableId;
+  try {
+    if (typeof node.setRangeTextStyleId === "function") {
+      node.setRangeTextStyleId(0, node.characters.length, variableId);
+    }
+  } catch {
+    // fall back to direct assignment if available
+  }
+
+  try {
+    (node as any).textStyleId = variableId;
+  } catch {
+    return false;
+  }
   return true;
+};
+
+export const getTypography = (node: TextNode) => getNodeTypography(node);
+
+export const loadAllNodeFonts = async (node: TextNode) => {
+  try {
+    const len = node.characters?.length ?? 0;
+    if (len === 0) return;
+    const fonts = await node.getRangeAllFontNames(0, len);
+    for (const f of fonts) {
+      try {
+        await figma.loadFontAsync(f);
+      } catch {
+        // continue to try other fonts
+      }
+    }
+  } catch {
+    // ignore errors from getRangeAllFontNames; best effort
+  }
+};
+
+export const loadFontsForTypography = async (node: TextNode, target?: TypographyValue) => {
+  // Load the current font so range edits are allowed.
+  try {
+    const existing = node.getRangeFontName(0, Math.min(1, node.characters.length || 1));
+    if (existing !== figma.mixed) {
+      await figma.loadFontAsync(existing as FontName);
+    }
+  } catch {
+    // ignore
+  }
+
+  // Load the target font if provided.
+  if (target?.fontFamily && target?.fontStyle) {
+    try {
+      await figma.loadFontAsync({ family: target.fontFamily, style: target.fontStyle });
+    } catch {
+      // swallow; apply will surface failure if fonts are truly missing
+    }
+  }
 };

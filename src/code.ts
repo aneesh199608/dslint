@@ -68,6 +68,7 @@ figma.ui.onmessage = async (msg) => {
         fills: msg.fills !== false,
         strokes: msg.strokes !== false,
         spacing: spacingFlag,
+        typography: msg.typography !== false,
       });
       await handleScan(msg.mode);
     } catch (error) {

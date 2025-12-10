@@ -158,6 +158,10 @@
           Strokes
         </label>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
+          <input type="checkbox" id="chk-typography" checked />
+          Typography
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
           <input type="checkbox" id="chk-spacing" checked />
           Spacings
         </label>
@@ -188,6 +192,7 @@
       const filterSelect = document.getElementById("filter");
       const chkFills = document.getElementById("chk-fills");
       const chkStrokes = document.getElementById("chk-strokes");
+      const chkTypography = document.getElementById("chk-typography");
       const chkSpacing = document.getElementById("chk-spacing");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
@@ -207,7 +212,7 @@
       const renderList = (items) => {
         if (!listEl) return;
         if (!items || items.length === 0) {
-          listEl.innerHTML = `<p style="color:#94a3b8;font-size:12px;margin-top:12px;">No nodes with fills found in selection.</p>`;
+          listEl.innerHTML = `<p style="color:#94a3b8;font-size:12px;margin-top:12px;">No supported nodes found in selection.</p>`;
           return;
         }
 
@@ -277,9 +282,10 @@
               item.cornerRadius?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="cornerRadius" class="row-apply">Apply Corner Radius Token</button>`
                 : "";
-            const typoBtn = item.typography
-              ? `<button data-id="${item.id}" data-target="typography" class="row-apply" disabled title="Typography apply coming soon" style="opacity:0.5;cursor:not-allowed;">Apply Typography Token</button>`
-              : "";
+            const typoBtn =
+              item.typography?.state === "missing"
+                ? `<button data-id="${item.id}" data-target="typography" class="row-apply">Apply Typography Token</button>`
+                : "";
 
             const buttons = `<div style="display:flex;align-items:center;gap:6px;">${highlight}${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${borderBtn}${radiusBtn}${typoBtn}</div>`;
             return `<div class="row" data-id="${item.id}">
@@ -359,6 +365,7 @@
               mode: getMode(),
               fills: chkFills?.checked !== false,
               strokes: chkStrokes?.checked !== false,
+              typography: chkTypography?.checked !== false,
               spacing: chkSpacing?.checked !== false,
             },
           },

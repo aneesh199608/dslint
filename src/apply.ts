@@ -1,7 +1,12 @@
 import { sendStatus } from "./messages";
 import { findNearestColorVariable, resolveColorForMode } from "./variables";
 import { scanSelection } from "./scanner";
-import { findMatchingTypographyVariable, findNumericVariableMatch } from "./typography";
+import {
+  findMatchingTypographyVariable,
+  getTypography,
+  loadFontsForTypography,
+  loadAllNodeFonts,
+} from "./typography";
 import { findSpacingVariable } from "./spacing";
 import type { ModePreference } from "./types";
 
@@ -598,7 +603,7 @@ export const applyCornerRadiusTokenToNode = async (
 
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
-  opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean }
+  opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean; typography?: boolean }
 ) => {
   const results = await scanSelection(preferredModeName);
   if (!results.length) return;
@@ -622,6 +627,9 @@ export const applyAllMissing = async (
     if (opts?.spacing !== false && item.cornerRadius?.state === "missing") {
       await applyCornerRadiusTokenToNode(item.id, preferredModeName);
     }
+    if (opts?.typography !== false && item.typography?.state === "missing") {
+      await applyTypographyToNode(item.id, preferredModeName);
+    }
   }
 
   await scanSelection(preferredModeName);
@@ -639,15 +647,102 @@ export const applyTypographyToNode = async (nodeId: string, preferredModeName: M
       return;
     }
 
+    const typoInfo = getTypography(node);
+    if (!typoInfo.value) {
+      sendStatus({
+        title: "Typography not applied",
+        message: typoInfo.reason ?? "Typography values are mixed or unsupported.",
+        state: "info",
+      });
+      return;
+    }
+
+    if ((node.characters?.length ?? 0) === 0) {
+      sendStatus({
+        title: "Typography not applied",
+        message: "Empty text node; nothing to style.",
+        state: "info",
+      });
+      return;
+    }
+
+    const match = await findMatchingTypographyVariable(node, preferredModeName, typoInfo.value);
+    if (!match) {
+      sendStatus({
+        title: "No typography token found",
+        message: "No matching text style for this typography.",
+        state: "info",
+      });
+      return;
+    }
+
+    if (node.textStyleId && node.textStyleId !== figma.mixed && node.textStyleId === match.variable.id) {
+      sendStatus({
+        title: "Typography already applied",
+        message: "This text is already bound to that text style.",
+        state: "info",
+      });
+      return;
+    }
+
+    await loadFontsForTypography(node, {
+      fontFamily: (match.variable as any).fontName?.family ?? typoInfo.value.fontFamily,
+      fontStyle: (match.variable as any).fontName?.style ?? typoInfo.value.fontStyle,
+    });
+    await loadAllNodeFonts(node);
+
+    let applied = false;
+    try {
+      if (typeof (node as any).setRangeTextStyleIdAsync === "function") {
+        await (node as any).setRangeTextStyleIdAsync(0, node.characters.length, match.variable.id);
+        applied = true;
+      } else if (typeof node.setRangeTextStyleId === "function") {
+        node.setRangeTextStyleId(0, node.characters.length, match.variable.id);
+        applied = true;
+      }
+    } catch (err) {
+      console.error("Typography apply setRangeTextStyleId error", err);
+    }
+
+    if (!applied) {
+      try {
+        if (typeof (node as any).setTextStyleIdAsync === "function") {
+          await (node as any).setTextStyleIdAsync(match.variable.id);
+          applied = true;
+        } else {
+          (node as any).textStyleId = match.variable.id;
+          applied = true;
+        }
+      } catch (err) {
+        console.error("Typography apply textStyleId error", err);
+        applied = false;
+      }
+    }
+
+    if (!applied) {
+      sendStatus({
+        title: "Apply failed",
+        message: "Could not bind the text style to this node. Check plugin console for details.",
+        state: "error",
+      });
+      console.error("Typography apply failed", {
+        nodeId,
+        styleId: match.variable.id,
+        styleName: match.variable.name,
+      });
+      return;
+    }
+
     sendStatus({
-      title: "Typography coming soon",
-      message: "Apply for typography tokens is not available yet.",
-      state: "info",
+      title: "Typography token applied",
+      message: `Applied typography style: ${match.variable.name}`,
+      state: "applied",
     });
   } catch (error) {
+    console.error("Typography apply error", error);
     sendStatus({
       title: "Apply failed",
-      message: "Could not apply typography token.",
+      message: `Could not apply typography token.${error?.message ? ` ${error.message}` : ""}`,
       state: "error",
     });
   }
