@@ -392,6 +392,13 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
     }
 
     if ("cornerRadius" in node) {
+      const bindable = typeof (node as any).setBoundVariable === "function";
+      if (!bindable) {
+        cornerRadius = {
+          message: "Corner radius token binding not supported for this node type.",
+          state: "info",
+        };
+      } else {
       const bound = (node as any).boundVariables;
       const radius = (node as any).cornerRadius;
 
@@ -484,6 +491,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
             }
           }
         }
+      }
       }
     }
 

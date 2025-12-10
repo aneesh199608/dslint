@@ -489,6 +489,8 @@ export const applyCornerRadiusTokenToNode = async (
   preferredModeName: ModePreference
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+  const canBindCornerRadius = !!node && "cornerRadius" in node && typeof (node as any).setBoundVariable === "function";
+
   if (!node || !("cornerRadius" in node)) {
     sendStatus({
       title: "Unsupported selection",
@@ -498,33 +500,105 @@ export const applyCornerRadiusTokenToNode = async (
     return;
   }
 
+  if (!canBindCornerRadius) {
+    sendStatus({
+      title: "Corner radius not supported",
+      message: "This node type does not support binding corner radius to variables.",
+      state: "error",
+    });
+    return;
+  }
+
   const radiusValue = (node as any).cornerRadius;
 
-  const bindCorner = async (prop: string, variableId: string) => {
+  const writeFallbackBinding = (prop: string, variableId: string) => {
     try {
-      (node as any).setBoundVariable?.(prop, variableId);
-    } catch {
-      // swallow binding errors
+      const current = ((node as any).boundVariables ?? {}) as Record<string, any>;
+      (node as any).boundVariables = {
+        ...current,
+        [prop]: { id: variableId, type: "VARIABLE_ALIAS" },
+      };
+    } catch (err) {
+      console.warn("Corner radius fallback boundVariables write failed", {
+        nodeId,
+        nodeType: (node as any).type,
+        prop,
+        variableId,
+        err,
+      });
+    }
+  };
+
+  const bindCorner = async (prop: string, variable: Variable) => {
+    try {
+      (node as any).setBoundVariable?.(prop, variable);
+      return true;
+    } catch (err) {
+      console.warn("Corner radius setBoundVariable failed", {
+        nodeId,
+        nodeType: (node as any).type,
+        prop,
+        variableId: variable.id,
+        err,
+      });
+      writeFallbackBinding(prop, variable.id);
+      return false;
     }
   };
 
   const applyVariable = async (variable: Variable) => {
+    const propsBound: string[] = [];
     if (radiusValue !== figma.mixed) {
       // Uniform radius: bind to cornerRadius and to all corners for consistency.
-      bindCorner("cornerRadius", variable.id);
-      bindCorner("topLeftRadius", variable.id);
-      bindCorner("topRightRadius", variable.id);
-      bindCorner("bottomRightRadius", variable.id);
-      bindCorner("bottomLeftRadius", variable.id);
+      if (await bindCorner("cornerRadius", variable)) propsBound.push("cornerRadius");
+      if (await bindCorner("topLeftRadius", variable)) propsBound.push("topLeftRadius");
+      if (await bindCorner("topRightRadius", variable)) propsBound.push("topRightRadius");
+      if (await bindCorner("bottomRightRadius", variable)) propsBound.push("bottomRightRadius");
+      if (await bindCorner("bottomLeftRadius", variable)) propsBound.push("bottomLeftRadius");
     } else {
       // Mixed radii: bind per-corner if present.
       const corners = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"] as const;
       for (const c of corners) {
         const val = (node as any)[c];
         if (typeof val === "number" && val > 0) {
-          bindCorner(c, variable.id);
+          if (await bindCorner(c, variable)) propsBound.push(c);
         }
       }
+    }
+
+    const bound = (node as any).boundVariables;
+    const hasBound =
+      !!bound?.cornerRadius ||
+      !!bound?.topLeftRadius ||
+      !!bound?.topRightRadius ||
+      !!bound?.bottomRightRadius ||
+      !!bound?.bottomLeftRadius;
+
+    if (!hasBound) {
+      console.warn("Corner radius binding did not stick; aborting success status", {
+        nodeId,
+        nodeType: (node as any).type,
+        attemptedProps: propsBound,
+        boundVariables: bound,
+      });
+      sendStatus({
+        title: "Corner radius not applied",
+        message:
+          "Could not bind corner radius to the spacing token. Check if the node type or component overrides allow radius binding.",
+        state: "error",
+      });
+      return;
+    }
+
+    try {
+      console.info("Corner radius applied", {
+        nodeId,
+        nodeType: (node as any).type,
+        variable: { id: variable.id, name: variable.name },
+        boundVariables: (node as any).boundVariables,
+      });
+    } catch {
+      // ignore logging errors
     }
     sendStatus({
       title: "Corner radius token applied",
