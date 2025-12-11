@@ -2,7 +2,8 @@
 
 ## User symptom
 - Plugin UI libraries dropdown only shows `All libraries` and `Created in this file` even though the Figma file has multiple enabled libraries (e.g., “iOS and iPadOS 26”, “Material 3 Design Kit”, “Simple Design System”).
-- Selecting `All libraries` applies tokens created in this file only; external library tokens are not surfaced or bound.
+- Selecting `All libraries` and applying it appies the token that was created in this file type, so there is no issue there, but I want to see all libraries. 
+- Probably we need to remove the 'All libraries', instead show 'Created in this file' , and other enabled libraries ((e.g., “iOS and iPadOS 26”, “Material 3 Design Kit”, “Simple Design System”).)
 - Manual Figma “Apply variable” UI does show those libraries and can apply their tokens, so access is available/enabled.
 
 ## Current implementation touchpoints
@@ -37,9 +38,8 @@
 4) Update UI to surface load errors (currently only a note) so users see when library fetch/import fails.
 
 ## Expected behavior
-- Dropdown should list each enabled library by name (from teamLibrary API), in addition to or instead of the current `All libraries`/`Created in this file` defaults.
-- Proposed: drop `All libraries` and show `Created in this file` plus each enabled library (“iOS and iPadOS 26”, “Material 3 Design Kit”, “Simple Design System”) to mirror Figma’s picker and avoid the broken aggregate state.
-- When a specific library is chosen, scan/apply should import variables from that library and include them even when the current file has zero local variables.
+- Dropdown should list each enabled library by name (from teamLibrary API), in addition to `All libraries` and `Created in this file`.
+- `All libraries` scope should import variables from all enabled libraries and include them in scan/apply resolution even when the current file has zero local variables.
 
 ## Files of interest
 - `manifest.json` (permissions include `"teamlibrary"`)

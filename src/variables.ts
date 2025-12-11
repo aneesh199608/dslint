@@ -1,4 +1,4 @@
-import { colorsEqual, rgbDistanceSq, type RGBA } from "./colors";
+import { colorsEqual, type RGBA } from "./colors";
 import type { LibraryScope, ModePreference } from "./types";
 import { getVariablesForScope, LOCAL_LIBRARY_OPTION } from "./libraries";
 
@@ -62,15 +62,11 @@ export const findNearestColorVariable = async (
   preferredModeName: ModePreference,
   libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
-  // Be lenient on opacity matching so very low opacities (e.g. 0.1%) still match.
   // Clamp in case Figma returns an undefined opacity (defaults to 1).
   const paintAlpha = Math.min(1, Math.max(0, opacity ?? 1));
-  const alphaEps = 2e-2;
-  const alphaWeight = 4; // weight alpha difference in the distance score
+  const alphaEps = 2e-2; // small lenience for float precision and ultra-low opacity values
   const variables = await getVariablesForScope("COLOR", libraryScope);
   const exactMatches: { variable: Variable; isMulti: boolean }[] = [];
-  let bestMulti: { variable: Variable; score: number; alphaDelta: number } | null = null;
-  let bestSingle: { variable: Variable; score: number; alphaDelta: number } | null = null;
 
   for (const variable of variables) {
     const collection = await figma.variables.getVariableCollectionByIdAsync(
@@ -82,26 +78,12 @@ export const findNearestColorVariable = async (
     if (!variableColor) continue;
 
     const isMultiMode = collection.modes.length > 1;
-
     const variableAlpha = variableColor.a ?? 1;
     const alphaDelta = Math.abs(variableAlpha - paintAlpha);
 
-    // We already gate on alphaDelta; compare channels while respecting the paint's opacity
-    // (opacity lives on the paint, not the color object).
+    // Exact match only: compare channels with opacity considered, allow tiny float wiggle room.
     if (alphaDelta <= alphaEps && colorsEqual(variableColor, color, 1, paintAlpha)) {
       exactMatches.push({ variable, isMulti: isMultiMode });
-      continue;
-    }
-
-    const distance = rgbDistanceSq(color, variableColor, paintAlpha, variableAlpha);
-    // Penalize opacity differences but never hard-reject; this keeps us from missing
-    // low-alpha tokens while still preferring close matches.
-    const alphaPenalty = alphaDelta * alphaWeight;
-    const score = distance + alphaPenalty;
-    if (isMultiMode) {
-      if (!bestMulti || score < bestMulti.score) bestMulti = { variable, score, alphaDelta };
-    } else {
-      if (!bestSingle || score < bestSingle.score) bestSingle = { variable, score, alphaDelta };
     }
   }
 
@@ -111,10 +93,5 @@ export const findNearestColorVariable = async (
     return (multi ?? exactMatches[0]).variable;
   }
 
-  const winner = bestMulti ?? bestSingle;
-  // Avoid applying a clearly wrong token when opacity is far off (e.g., 0.1% vs 100%).
-  const alphaHardCap = 0.25; // absolute alpha difference allowed when we only have fuzzy matches
-  if (winner && winner.alphaDelta > alphaHardCap) return null;
-
-  return winner?.variable ?? null;
+  return null;
 };

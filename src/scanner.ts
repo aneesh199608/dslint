@@ -4,6 +4,7 @@ import { gatherNodesWithPaints } from "./selection";
 import { findMatchingTypographyVariable, getTypography } from "./typography";
 import { findSpacingVariable } from "./spacing";
 import { setOriginalSelection } from "./highlight";
+import { findNearestColorVariable } from "./variables";
 import type {
   LibraryScope,
   ModePreference,
@@ -22,7 +23,8 @@ const isZero = (value: number | null | undefined) => Math.abs(value ?? 0) < 0.00
 const evalPaint = async (
   node: SceneNode,
   kind: "fill" | "stroke",
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope
 ): Promise<PaintInfo | null> => {
   const paints = kind === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
   if (!Array.isArray(paints) || paints.length === 0) {
@@ -98,10 +100,27 @@ const evalPaint = async (
         }%`
       : "";
 
+  // Only actionable missing if there is an exact color+opacity token match.
+  const match = await findNearestColorVariable(
+    first.color,
+    opacity,
+    preferredModeName,
+    libraryScope
+  );
+  if (match) {
+    return {
+      kind,
+      message: `Matches variable: ${match.name}${opacityDisplay}`,
+      state: "missing",
+      variableName: match.name,
+      hex,
+    };
+  }
+
   return {
     kind,
-      message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex}${opacityDisplay} is not using a variable.`,
-    state: "missing",
+      message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex}${opacityDisplay} is not using a variable (no exact token match).`,
+    state: "info",
     hex,
   };
 };
@@ -151,8 +170,8 @@ export const scanSelection = async (
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
-    const fill = await evalPaint(node, "fill", preferredModeName);
-    const stroke = await evalPaint(node, "stroke", preferredModeName);
+    const fill = await evalPaint(node, "fill", preferredModeName, libraryScope);
+    const stroke = await evalPaint(node, "stroke", preferredModeName, libraryScope);
     let typography: TypographyInfo | undefined;
     let padding: PaddingInfo | undefined;
     let gap: GapInfo | undefined;

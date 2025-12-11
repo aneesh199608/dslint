@@ -69,7 +69,7 @@ export const applyNearestTokenToNode = async (
   if (!nearestVariable) {
     sendStatus({
       title: "No tokens found",
-      message: "Could not find a suitable color token to apply.",
+      message: "No exact color token match found (requires matching color and opacity).",
       state: "error",
     });
     return;
