@@ -155,11 +155,6 @@ export const runLibraryDiagnostics = async () => {
         })),
       });
     }
-    sendStatus({
-      title: "Library diagnostics",
-      message: `Fetched ${cols.length} library collections; see console for details.`,
-      state: "info",
-    });
   } catch (err) {
     console.error("[dslint][libraries][diag] collection fetch failed", err);
     const msg =

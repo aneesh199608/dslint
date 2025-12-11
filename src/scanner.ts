@@ -167,6 +167,13 @@ export const scanSelection = async (
   }
 
   const nodes = gatherNodesWithPaints(selection);
+  if (nodes.length) {
+    sendStatus({
+      title: "Scanning...",
+      message: "Analyzing selection for tokens.",
+      state: "info",
+    });
+  }
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
