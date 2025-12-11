@@ -8,12 +8,14 @@ import {
   loadAllNodeFonts,
 } from "./typography";
 import { findSpacingVariable } from "./spacing";
-import type { ModePreference } from "./types";
+import type { LibraryScope, ModePreference } from "./types";
+import { LOCAL_LIBRARY_OPTION } from "./libraries";
 
 export const applyNearestTokenToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  target: "fill" | "stroke" = "fill"
+  target: "fill" | "stroke" = "fill",
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node) {
@@ -60,7 +62,8 @@ export const applyNearestTokenToNode = async (
   const nearestVariable = await findNearestColorVariable(
     first.color,
     paintOpacity,
-    preferredModeName
+    preferredModeName,
+    libraryScope
   );
 
   if (!nearestVariable) {
@@ -155,7 +158,8 @@ export const applyNearestTokenToNode = async (
 
 export const applyPaddingTokenToNode = async (
   nodeId: string,
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || !("paddingLeft" in node)) {
@@ -193,7 +197,7 @@ export const applyPaddingTokenToNode = async (
       });
       return;
     }
-    const match = await findSpacingVariable(pl);
+    const match = await findSpacingVariable(pl, libraryScope);
     if (!match) {
       sendStatus({
         title: "No padding token found",
@@ -217,8 +221,8 @@ export const applyPaddingTokenToNode = async (
 
   const isHorizontal = pl === pr && pt === pb;
   if (isHorizontal) {
-    const hVar = pl > 0 ? await findSpacingVariable(pl) : null;
-    const vVar = pt > 0 ? await findSpacingVariable(pt) : null;
+    const hVar = pl > 0 ? await findSpacingVariable(pl, libraryScope) : null;
+    const vVar = pt > 0 ? await findSpacingVariable(pt, libraryScope) : null;
     if (!hVar && !vVar) {
       sendStatus({
         title: "No padding tokens found",
@@ -245,10 +249,10 @@ export const applyPaddingTokenToNode = async (
   }
 
   // Per-side binding if possible.
-  const topVar = pt > 0 ? await findSpacingVariable(pt) : null;
-  const rightVar = pr > 0 ? await findSpacingVariable(pr) : null;
-  const bottomVar = pb > 0 ? await findSpacingVariable(pb) : null;
-  const leftVar = pl > 0 ? await findSpacingVariable(pl) : null;
+  const topVar = pt > 0 ? await findSpacingVariable(pt, libraryScope) : null;
+  const rightVar = pr > 0 ? await findSpacingVariable(pr, libraryScope) : null;
+  const bottomVar = pb > 0 ? await findSpacingVariable(pb, libraryScope) : null;
+  const leftVar = pl > 0 ? await findSpacingVariable(pl, libraryScope) : null;
 
   if (!topVar && !rightVar && !bottomVar && !leftVar) {
     sendStatus({
@@ -271,7 +275,11 @@ export const applyPaddingTokenToNode = async (
   });
 };
 
-export const applyGapTokenToNode = async (nodeId: string, preferredModeName: ModePreference) => {
+export const applyGapTokenToNode = async (
+  nodeId: string,
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || !("itemSpacing" in node) || !("layoutMode" in node)) {
     sendStatus({
@@ -320,7 +328,7 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
     return;
   }
 
-  const match = await findSpacingVariable(spacing);
+  const match = await findSpacingVariable(spacing, libraryScope);
   if (!match) {
     sendStatus({
       title: "No gap token found",
@@ -341,7 +349,8 @@ export const applyGapTokenToNode = async (nodeId: string, preferredModeName: Mod
 
 export const applyStrokeWeightTokenToNode = async (
   nodeId: string,
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || !("strokeWeight" in node) || !("strokes" in node)) {
@@ -383,7 +392,7 @@ export const applyStrokeWeightTokenToNode = async (
     return;
   }
 
-  const match = await findSpacingVariable(weight);
+  const match = await findSpacingVariable(weight, libraryScope);
   if (!match) {
     sendStatus({
       title: "No stroke weight token found",
@@ -486,7 +495,8 @@ export const applyStrokeWeightTokenToNode = async (
 
 export const applyCornerRadiusTokenToNode = async (
   nodeId: string,
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   const canBindCornerRadius = !!node && "cornerRadius" in node && typeof (node as any).setBoundVariable === "function";
@@ -617,7 +627,7 @@ export const applyCornerRadiusTokenToNode = async (
       return;
     }
 
-    const match = await findSpacingVariable(radiusValue);
+    const match = await findSpacingVariable(radiusValue, libraryScope);
     if (match) {
       await applyVariable(match);
       return;
@@ -651,7 +661,7 @@ export const applyCornerRadiusTokenToNode = async (
 
     let appliedAny = false;
     for (const c of applicable) {
-      const match = await findSpacingVariable(c.value as number);
+      const match = await findSpacingVariable(c.value as number, libraryScope);
       if (match) {
         await bindCorner(c.prop, match.id);
         appliedAny = true;
@@ -677,39 +687,44 @@ export const applyCornerRadiusTokenToNode = async (
 
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
+  libraryScope: LibraryScope,
   opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean; typography?: boolean }
 ) => {
-  const results = await scanSelection(preferredModeName);
+  const results = await scanSelection(preferredModeName, libraryScope);
   if (!results.length) return;
 
   for (const item of results) {
     if (opts?.fills !== false && item.fill?.state === "missing") {
-      await applyNearestTokenToNode(item.id, preferredModeName, "fill");
+      await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope);
     }
     if (opts?.strokes !== false && item.stroke?.state === "missing") {
-      await applyNearestTokenToNode(item.id, preferredModeName, "stroke");
+      await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope);
     }
     if (opts?.spacing !== false && item.padding?.state === "missing") {
-      await applyPaddingTokenToNode(item.id, preferredModeName);
+      await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope);
     }
     if (opts?.spacing !== false && item.gap?.state === "missing") {
-      await applyGapTokenToNode(item.id, preferredModeName);
+      await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
     }
     if (opts?.spacing !== false && item.strokeWeight?.state === "missing") {
-      await applyStrokeWeightTokenToNode(item.id, preferredModeName);
+      await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
     }
     if (opts?.spacing !== false && item.cornerRadius?.state === "missing") {
-      await applyCornerRadiusTokenToNode(item.id, preferredModeName);
+      await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
     }
     if (opts?.typography !== false && item.typography?.state === "missing") {
-      await applyTypographyToNode(item.id, preferredModeName);
+      await applyTypographyToNode(item.id, preferredModeName, libraryScope);
     }
   }
 
-  await scanSelection(preferredModeName);
+  await scanSelection(preferredModeName, libraryScope);
 };
 
-export const applyTypographyToNode = async (nodeId: string, preferredModeName: ModePreference) => {
+export const applyTypographyToNode = async (
+  nodeId: string,
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+) => {
   try {
     const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
     if (!node || node.type !== "TEXT") {
@@ -740,7 +755,12 @@ export const applyTypographyToNode = async (nodeId: string, preferredModeName: M
       return;
     }
 
-    const match = await findMatchingTypographyVariable(node, preferredModeName, typoInfo.value);
+    const match = await findMatchingTypographyVariable(
+      node,
+      preferredModeName,
+      libraryScope,
+      typoInfo.value
+    );
     if (!match) {
       sendStatus({
         title: "No typography token found",

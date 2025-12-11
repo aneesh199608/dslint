@@ -1,5 +1,6 @@
 import { colorsEqual, rgbDistanceSq, type RGBA } from "./colors";
-import type { ModePreference } from "./types";
+import type { LibraryScope, ModePreference } from "./types";
+import { getVariablesForScope, LOCAL_LIBRARY_OPTION } from "./libraries";
 
 const pickModeId = (
   collection: VariableCollection,
@@ -58,14 +59,15 @@ export const resolveColorForMode = async (
 export const findNearestColorVariable = async (
   color: RGB,
   opacity: number,
-  preferredModeName: ModePreference
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   // Be lenient on opacity matching so very low opacities (e.g. 0.1%) still match.
   // Clamp in case Figma returns an undefined opacity (defaults to 1).
   const paintAlpha = Math.min(1, Math.max(0, opacity ?? 1));
   const alphaEps = 2e-2;
   const alphaWeight = 4; // weight alpha difference in the distance score
-  const variables = await figma.variables.getLocalVariablesAsync("COLOR");
+  const variables = await getVariablesForScope("COLOR", libraryScope);
   const exactMatches: { variable: Variable; isMulti: boolean }[] = [];
   let bestMulti: { variable: Variable; score: number; alphaDelta: number } | null = null;
   let bestSingle: { variable: Variable; score: number; alphaDelta: number } | null = null;

@@ -1,4 +1,5 @@
-import type { ModePreference } from "./types";
+import type { LibraryScope, ModePreference } from "./types";
+import { getVariablesForScope, LOCAL_LIBRARY_OPTION } from "./libraries";
 
 type TypographyValue = {
   fontFamily?: string;
@@ -127,6 +128,7 @@ const getDefaultModeIdForVariable = async (variable: Variable) => {
 export const findMatchingTypographyVariable = async (
   node: SceneNode,
   _preferredModeName: ModePreference,
+  _libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
   override?: TypographyValue
 ) => {
   if (!isTextNode(node)) return null;
@@ -154,9 +156,10 @@ export const findMatchingTypographyVariable = async (
 
 export const findNumericVariableMatch = async (
   kind: "fontSize" | "lineHeight" | "letterSpacing",
-  value: number
+  value: number,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
-  const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
+  const vars = await getVariablesForScope("FLOAT", libraryScope);
   for (const variable of vars) {
     const modeId = await getDefaultModeIdForVariable(variable);
     if (!modeId) continue;

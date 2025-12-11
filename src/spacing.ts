@@ -1,3 +1,6 @@
+import type { LibraryScope } from "./types";
+import { getVariablesForScope, LOCAL_LIBRARY_OPTION } from "./libraries";
+
 // Helpers for spacing variables (padding, etc.)
 
 const resolveNumericValue = async (variable: Variable) => {
@@ -19,8 +22,11 @@ const resolveNumericValue = async (variable: Variable) => {
 const EPSILON = 1e-5;
 export const DEFAULT_SPACING_TOLERANCE = 2;
 
-export const findSpacingVariable = async (value: number) => {
-  const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
+export const findSpacingVariable = async (
+  value: number,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+) => {
+  const vars = await getVariablesForScope("FLOAT", libraryScope);
   for (const variable of vars) {
     const resolved = await resolveNumericValue(variable);
     if (resolved !== null && Math.abs(resolved - value) < EPSILON) {
@@ -32,9 +38,10 @@ export const findSpacingVariable = async (value: number) => {
 
 export const findNearestSpacingVariable = async (
   value: number,
-  tolerance: number = DEFAULT_SPACING_TOLERANCE
+  tolerance: number = DEFAULT_SPACING_TOLERANCE,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
-  const vars = await figma.variables.getLocalVariablesAsync("FLOAT");
+  const vars = await getVariablesForScope("FLOAT", libraryScope);
   let best: { variable: Variable; diff: number } | null = null;
 
   for (const variable of vars) {

@@ -5,6 +5,7 @@ import { findMatchingTypographyVariable, getTypography } from "./typography";
 import { findSpacingVariable } from "./spacing";
 import { setOriginalSelection } from "./highlight";
 import type {
+  LibraryScope,
   ModePreference,
   NodeScanResult,
   PaintInfo,
@@ -129,7 +130,10 @@ const computeOverallState = (
   return "info";
 };
 
-export const scanSelection = async (preferredModeName: ModePreference): Promise<NodeScanResult[]> => {
+export const scanSelection = async (
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope
+): Promise<NodeScanResult[]> => {
   const selection = figma.currentPage.selection;
   setOriginalSelection(selection);
 
@@ -186,6 +190,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
         const match = await findMatchingTypographyVariable(
           node,
           preferredModeName,
+          libraryScope,
           typoInfo.value
         );
         if (match) {
@@ -238,7 +243,10 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
           };
         } else {
           const matches = await Promise.all(
-            relevant.map(async (s) => ({ ...s, match: await findSpacingVariable(s.value) }))
+            relevant.map(async (s) => ({
+              ...s,
+              match: await findSpacingVariable(s.value, libraryScope),
+            }))
           );
           const unmatched = matches.filter((m) => !m.match);
           if (unmatched.length) {
@@ -287,7 +295,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
               variableName: variable?.name,
             };
           } else {
-            const match = await findSpacingVariable(spacing);
+            const match = await findSpacingVariable(spacing, libraryScope);
             if (match) {
               gap = {
                 message: `Gap matches token ${match.name}`,
@@ -373,7 +381,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
           if (isZero(weight)) {
             strokeWeightInfo = undefined;
           } else {
-            const match = await findSpacingVariable(weight);
+            const match = await findSpacingVariable(weight, libraryScope);
             if (match) {
               strokeWeightInfo = {
                 message: `Stroke weight matches token ${match.name}`,
@@ -430,7 +438,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
           if (boundId) {
             await setFound(boundId);
           } else {
-            const match = await findSpacingVariable(radius);
+            const match = await findSpacingVariable(radius, libraryScope);
             if (match) {
               cornerRadius = {
                 message: `Corner radius matches token ${match.name}`,
@@ -463,7 +471,7 @@ export const scanSelection = async (preferredModeName: ModePreference): Promise<
             const matches = await Promise.all(
               corners.map(async (c) => ({
                 ...c,
-                match: c.bound ? null : await findSpacingVariable(c.value as number),
+                match: c.bound ? null : await findSpacingVariable(c.value as number, libraryScope),
               }))
             );
             const matched = matches.filter((m) => m.match);

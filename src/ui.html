@@ -138,6 +138,9 @@
             <option value="Light">Light</option>
             <option value="Dark">Dark</option>
           </select>
+          <select id="library" class="icon-button" title="Libraries">
+            <option value="local">Created in this file</option>
+          </select>
         </div>
         <button
           id="refresh"
@@ -182,6 +185,9 @@
     <p id="dark-note" style="display:none;font-size:12px;color:#475569;margin:8px 0 0;">
       Using Dark mode—remember to set Figma's Appearance to Dark so tokens resolve correctly.
     </p>
+    <p id="library-note" style="display:none;font-size:12px;color:#b91c1c;margin:6px 0 0;">
+      Unable to load libraries. Showing local variables only.
+    </p>
     <div id="list"></div>
     <script>
       const titleEl = document.getElementById("title");
@@ -197,6 +203,8 @@
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
+      const librarySelect = document.getElementById("library");
+      const libraryNote = document.getElementById("library-note");
 
       const getMode = () => {
         const val = themeSelect?.value === "Dark" ? "Dark" : "Light";
@@ -207,6 +215,41 @@
         if (!darkNote) return;
         const isDark = getMode() === "Dark";
         darkNote.style.display = isDark ? "block" : "none";
+      };
+
+      const setLibraryError = (message) => {
+        if (!libraryNote) return;
+        if (message) {
+          libraryNote.textContent = message;
+          libraryNote.style.display = "block";
+        } else {
+          libraryNote.textContent = "Unable to load libraries. Showing local variables only.";
+          libraryNote.style.display = "none";
+        }
+      };
+
+      const getLibraryId = () => {
+        return librarySelect?.value || "local";
+      };
+
+      const renderLibraryOptions = (payload) => {
+        if (!librarySelect || !payload) return;
+        const options = payload.options || [];
+        librarySelect.innerHTML = options
+          .map((opt) => {
+            const label = opt.reason ? `${opt.label} (${opt.reason})` : opt.label;
+            const disabled = opt.disabled ? "disabled" : "";
+            return `<option value="${opt.id}" ${disabled}>${label}</option>`;
+          })
+          .join("");
+        const candidate =
+          payload.selectedId && librarySelect.querySelector(`option[value="${payload.selectedId}"]`)
+            ? payload.selectedId
+            : options[0]?.id;
+        if (candidate) {
+          librarySelect.value = candidate;
+        }
+        setLibraryError(payload.error);
       };
 
       const renderList = (items) => {
@@ -311,7 +354,15 @@
             const id = btn.getAttribute("data-id");
             const target = btn.getAttribute("data-target") || "fill";
             parent.postMessage(
-              { pluginMessage: { type: "apply-token", nodeId: id, target, mode: getMode() } },
+              {
+                pluginMessage: {
+                  type: "apply-token",
+                  nodeId: id,
+                  target,
+                  mode: getMode(),
+                  libraryId: getLibraryId(),
+                },
+              },
               "*"
             );
           });
@@ -351,10 +402,19 @@
         if (data.type === "scan-results") {
           renderList(data.payload.items || []);
         }
+        if (data.type === "libraries-options") {
+          renderLibraryOptions(data.payload);
+        }
+        if (data.type === "library-error") {
+          setLibraryError(data.payload?.message || "");
+        }
       });
 
       refreshBtn?.addEventListener("click", () => {
-        parent.postMessage({ pluginMessage: { type: "refresh", mode: getMode() } }, "*");
+        parent.postMessage(
+          { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
+          "*"
+        );
       });
 
       applyAllBtn?.addEventListener("click", () => {
@@ -363,6 +423,7 @@
             pluginMessage: {
               type: "apply-token-all",
               mode: getMode(),
+              libraryId: getLibraryId(),
               fills: chkFills?.checked !== false,
               strokes: chkStrokes?.checked !== false,
               typography: chkTypography?.checked !== false,
@@ -379,8 +440,26 @@
 
       filterSelect?.addEventListener("change", () => {
         // Re-render with the current cached list; easiest is to trigger a refresh.
-        parent.postMessage({ pluginMessage: { type: "refresh", mode: getMode() } }, "*");
+        parent.postMessage(
+          { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
+          "*"
+        );
       });
+
+      librarySelect?.addEventListener("change", () => {
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "set-library",
+              libraryId: getLibraryId(),
+              mode: getMode(),
+            },
+          },
+          "*"
+        );
+      });
+
+      // Debug runs once at startup via plugin; no UI control needed.
 
       updateDarkNote();
 

@@ -2,6 +2,21 @@ export type ModePreference = "Light" | "Dark";
 
 export type StatusState = "missing" | "found" | "applied" | "error" | "info";
 
+export type LibraryScopeKind = "local" | "all" | "library";
+
+export type LibraryScope =
+  | { type: "local" }
+  | { type: "all" }
+  | { type: "library"; id: string; libraryName: string; collectionKeys: string[] };
+
+export type LibraryOption = {
+  id: string;
+  label: string;
+  scope: LibraryScope;
+  disabled?: boolean;
+  reason?: string;
+};
+
 export type StatusPayload = {
   title: string;
   message: string;

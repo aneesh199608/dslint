@@ -10,45 +10,139 @@ import {
   applyCornerRadiusTokenToNode,
 } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
-import type { ModePreference } from "./types";
+import { fetchLibraryOptions, LOCAL_LIBRARY_OPTION, resolveScopeFromId, runLibraryDiagnostics } from "./libraries";
+import type { LibraryOption, LibraryScope, ModePreference } from "./types";
 
 const MIN_WIDTH = 480;
 const MIN_HEIGHT = 720;
 const DEFAULT_MODE: ModePreference = "Light";
+const LIBRARY_STORAGE_KEY = "dslint:library-scope";
 
 figma.showUI(__html__, { width: MIN_WIDTH, height: MIN_HEIGHT });
 
 const getMode = (mode?: ModePreference): ModePreference =>
   mode === "Dark" ? "Dark" : "Light";
 
-const handleScan = async (mode?: ModePreference) => {
-  await scanSelection(getMode(mode));
+let libraryOptions: LibraryOption[] = [LOCAL_LIBRARY_OPTION];
+let currentLibrary: LibraryOption = LOCAL_LIBRARY_OPTION;
+let libraryError: string | undefined;
+let librariesReady: Promise<void> | null = null;
+let librariesNeedsRetry = false;
+// Run diagnostics once at startup to log raw library API results.
+runLibraryDiagnostics().catch((err) => {
+  console.warn("Library diagnostics failed", err);
+});
+
+const sendLibraryOptionsToUI = () => {
+  figma.ui.postMessage({
+    type: "libraries-options",
+    payload: {
+      options: libraryOptions,
+      selectedId: currentLibrary.id,
+      error: undefined, // keep UI clean; errors handled via status/debug
+    },
+  });
 };
 
-handleScan(DEFAULT_MODE);
+const loadStoredLibraryId = async () => {
+  try {
+    const stored = await figma.clientStorage.getAsync(LIBRARY_STORAGE_KEY);
+    return typeof stored === "string" ? stored : undefined;
+  } catch (err) {
+    console.warn("Failed to read stored library scope", err);
+    return undefined;
+  }
+};
+
+const persistLibraryId = async (id: string) => {
+  try {
+    await figma.clientStorage.setAsync(LIBRARY_STORAGE_KEY, id);
+  } catch (err) {
+    console.warn("Failed to persist library scope", err);
+  }
+};
+
+const ensureLibrariesLoaded = async () => {
+  if (!librariesReady || librariesNeedsRetry) {
+    librariesNeedsRetry = false;
+    librariesReady = (async () => {
+      const storedId = await loadStoredLibraryId();
+      try {
+        const { options, error } = await fetchLibraryOptions();
+        libraryOptions = options;
+        libraryError = error;
+        currentLibrary = resolveScopeFromId(libraryOptions, storedId ?? currentLibrary.id);
+        // If we failed to load or only have local, allow retries on next call.
+        if (error || libraryOptions.length <= 1) {
+          librariesNeedsRetry = true;
+        }
+      } catch (error) {
+        console.warn("Library option fetch failed; defaulting to local only", error);
+        currentLibrary = resolveScopeFromId(libraryOptions, storedId ?? currentLibrary.id);
+        librariesNeedsRetry = true;
+      }
+      sendLibraryOptionsToUI();
+    })();
+  }
+  try {
+    await librariesReady;
+  } catch {
+    librariesReady = null;
+  }
+};
+
+const setLibrarySelection = async (libraryId?: string, persist?: boolean): Promise<LibraryScope> => {
+  await ensureLibrariesLoaded();
+  currentLibrary = resolveScopeFromId(libraryOptions, libraryId ?? currentLibrary.id);
+  if (persist) {
+    await persistLibraryId(currentLibrary.id);
+  }
+  sendLibraryOptionsToUI();
+  return currentLibrary.scope;
+};
+
+const handleScan = async (mode?: ModePreference, libraryId?: string) => {
+  const scope = await setLibrarySelection(libraryId, libraryId !== undefined);
+  await scanSelection(getMode(mode), scope);
+};
+
+handleScan(DEFAULT_MODE).catch((err) => console.error("Initial scan failed", err));
 
 figma.ui.onmessage = async (msg) => {
   if (msg?.type === "refresh") {
-    await handleScan(msg.mode);
+    await handleScan(msg.mode, msg.libraryId);
     return;
   }
 
+  if (msg?.type === "set-library") {
+    await setLibrarySelection(msg.libraryId, true);
+    await handleScan(msg.mode ?? DEFAULT_MODE, msg.libraryId);
+    return;
+  }
+
+
   if (msg?.type === "apply-token") {
     try {
+      const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
       if (msg.target === "typography") {
-        await applyTypographyToNode(msg.nodeId, getMode(msg.mode));
+        await applyTypographyToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "padding") {
-        await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode));
+        await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "gap") {
-        await applyGapTokenToNode(msg.nodeId, getMode(msg.mode));
+        await applyGapTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "strokeWeight") {
-        await applyStrokeWeightTokenToNode(msg.nodeId, getMode(msg.mode));
+        await applyStrokeWeightTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "cornerRadius") {
-        await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode));
+        await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else {
-        await applyNearestTokenToNode(msg.nodeId, getMode(msg.mode), msg.target ?? "fill");
+        await applyNearestTokenToNode(
+          msg.nodeId,
+          getMode(msg.mode),
+          msg.target ?? "fill",
+          scope
+        );
       }
-      await handleScan(msg.mode);
+      await handleScan(msg.mode, msg.libraryId);
     } catch (error) {
       sendStatus({
         title: "Apply failed",
@@ -62,15 +156,16 @@ figma.ui.onmessage = async (msg) => {
 
   if (msg?.type === "apply-token-all") {
     try {
+      const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
       const spacingFlag =
         msg.spacing !== undefined ? msg.spacing !== false : msg.padding !== false;
-      await applyAllMissing(getMode(msg.mode), {
+      await applyAllMissing(getMode(msg.mode), scope, {
         fills: msg.fills !== false,
         strokes: msg.strokes !== false,
         spacing: spacingFlag,
         typography: msg.typography !== false,
       });
-      await handleScan(msg.mode);
+      await handleScan(msg.mode, msg.libraryId);
     } catch (error) {
       sendStatus({
         title: "Apply failed",
