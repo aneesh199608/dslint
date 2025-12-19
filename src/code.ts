@@ -2,6 +2,7 @@ import { sendStatus } from "./messages";
 import { scanSelection } from "./scanner";
 import {
   applyAllMissing,
+  applyAllMissingForNode,
   applyNearestTokenToNode,
   applyTypographyToNode,
   applyPaddingTokenToNode,
@@ -158,6 +159,22 @@ figma.ui.onmessage = async (msg) => {
         state: "error",
       });
       console.error("Apply token error", error);
+    }
+    return;
+  }
+
+  if (msg?.type === "apply-token-layer") {
+    try {
+      const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
+      await applyAllMissingForNode(msg.nodeId, getMode(msg.mode), scope);
+      await handleScan(msg.mode, msg.libraryId);
+    } catch (error) {
+      sendStatus({
+        title: "Apply failed",
+        message: "Could not apply tokens for that layer. Try refreshing.",
+        state: "error",
+      });
+      console.error("Apply token layer error", error);
     }
     return;
   }

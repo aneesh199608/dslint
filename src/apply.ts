@@ -720,6 +720,45 @@ export const applyAllMissing = async (
   await scanSelection(preferredModeName, libraryScope);
 };
 
+export const applyAllMissingForNode = async (
+  nodeId: string,
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope
+) => {
+  const results = await scanSelection(preferredModeName, libraryScope);
+  const item = results.find((r) => r.id === nodeId);
+  if (!item) {
+    sendStatus({
+      title: "Apply failed",
+      message: "Node not found in current scan results.",
+      state: "error",
+    });
+    return;
+  }
+
+  if (item.fill?.state === "missing") {
+    await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope);
+  }
+  if (item.stroke?.state === "missing") {
+    await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope);
+  }
+  if (item.padding?.state === "missing") {
+    await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope);
+  }
+  if (item.gap?.state === "missing") {
+    await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
+  }
+  if (item.strokeWeight?.state === "missing") {
+    await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
+  }
+  if (item.cornerRadius?.state === "missing") {
+    await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
+  }
+  if (item.typography?.state === "missing") {
+    await applyTypographyToNode(item.id, preferredModeName, libraryScope);
+  }
+};
+
 export const applyTypographyToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,

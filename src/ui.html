@@ -292,6 +292,7 @@
         padding: 12px;
         margin-top: 8px;
         background: #ffffff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
       }
       .layer-card__header {
         display: flex;
@@ -301,13 +302,43 @@
       }
       .layer-card__title {
         font-weight: 600;
-        font-size: 12px;
+        font-size: 14px;
         color: #0f172a;
       }
       .layer-card__actions {
         display: inline-flex;
         align-items: center;
         gap: 6px;
+      }
+      .layer-button {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 4px 12px;
+        font-size: 12px;
+        color: #0f172a;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+        white-space: nowrap;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      }
+      .layer-button:disabled {
+        opacity: 0.5;
+        cursor: default;
+        box-shadow: none;
+      }
+      .layer-button:not(:disabled):hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+      }
+      .layer-button--icon {
+        padding: 6px;
+        border-radius: 8px;
+        min-width: 28px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
       .layer-card__body {
         display: flex;
@@ -327,55 +358,11 @@
         flex-wrap: wrap;
         margin-top: 6px;
       }
-      .layer-card__toggle {
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 6px;
-        cursor: pointer;
-        transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .layer-card__toggle:hover {
-        background: #eef2ff;
-        border-color: #94a3b8;
-      }
       .layer-card__toggle svg {
         transition: transform 150ms ease;
       }
       .layer-card.is-collapsed .layer-card__toggle svg {
         transform: rotate(180deg);
-      }
-      .row-apply {
-        border: 1px solid #cbd5e1;
-        background: linear-gradient(#ffffff, #f8fafc);
-        border-radius: 8px;
-        padding: 6px 10px;
-        font-size: 12px;
-        color: #0f172a;
-        cursor: pointer;
-        transition: background 120ms ease, border-color 120ms ease;
-      }
-      .row-apply:hover {
-        background: #eef2ff;
-        border-color: #94a3b8;
-      }
-      .row-highlight {
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 6px;
-        cursor: pointer;
-        transition: background 120ms ease, border-color 120ms ease;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .row-highlight:hover {
-        background: #eef2ff;
-        border-color: #94a3b8;
       }
       .primary-button {
         border: none;
@@ -915,7 +902,7 @@
 
         const rows = filtered
           .map((item) => {
-            const highlight = `<button data-id="${item.id}" class="row-highlight" title="Highlight in canvas">
+            const highlight = `<button data-id="${item.id}" class="row-highlight layer-button layer-button--icon" title="Highlight in canvas">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3.5"/>
                 <line x1="12" y1="2" x2="12" y2="6"/>
@@ -925,11 +912,22 @@
               </svg>
             </button>`;
             const isCollapsed = collapsedIds.has(item.id);
-            const toggle = `<button data-id="${item.id}" class="layer-card__toggle" aria-label="Toggle layer details" aria-expanded="${!isCollapsed}">
+            const toggle = `<button data-id="${item.id}" class="layer-card__toggle layer-button layer-button--icon" aria-label="Toggle layer details" aria-expanded="${!isCollapsed}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 15 12 9 18 15"></polyline>
               </svg>
             </button>`;
+            const hasMissing =
+              item.fill?.state === "missing" ||
+              item.stroke?.state === "missing" ||
+              item.padding?.state === "missing" ||
+              item.gap?.state === "missing" ||
+              item.strokeWeight?.state === "missing" ||
+              item.cornerRadius?.state === "missing" ||
+              item.typography?.state === "missing";
+            const layerApply = `<button data-id="${item.id}" class="layer-apply layer-button" ${
+              hasMissing ? "" : "disabled"
+            }>Apply Layer Tokens</button>`;
             const fillStatus = item.fill
               ? `<div class="layer-status" style="color:${getStatusColor(item.fill.state)};">Fill: ${formatStatusMessage(item.fill.message)}</div>`
               : "";
@@ -954,38 +952,38 @@
 
             const fillBtn =
               item.fill?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="fill" class="row-apply">Apply Fill Token</button>`
+                ? `<button data-id="${item.id}" data-target="fill" class="row-apply layer-button">Apply Fill Token</button>`
                 : "";
             const strokeBtn =
               item.stroke?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="stroke" class="row-apply">Apply Stroke Token</button>`
+                ? `<button data-id="${item.id}" data-target="stroke" class="row-apply layer-button">Apply Stroke Token</button>`
                 : "";
             const paddingBtn =
               item.padding?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="padding" class="row-apply">Apply Padding Token</button>`
+                ? `<button data-id="${item.id}" data-target="padding" class="row-apply layer-button">Apply Padding Token</button>`
                 : "";
             const gapBtn =
               item.gap?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="gap" class="row-apply">Apply Gap Token</button>`
+                ? `<button data-id="${item.id}" data-target="gap" class="row-apply layer-button">Apply Gap Token</button>`
                 : "";
             const borderBtn =
               item.strokeWeight?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="strokeWeight" class="row-apply">Apply Stroke Weight Token</button>`
+                ? `<button data-id="${item.id}" data-target="strokeWeight" class="row-apply layer-button">Apply Stroke Weight Token</button>`
                 : "";
             const radiusBtn =
               item.cornerRadius?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="cornerRadius" class="row-apply">Apply Corner Radius Token</button>`
+                ? `<button data-id="${item.id}" data-target="cornerRadius" class="row-apply layer-button">Apply Corner Radius Token</button>`
                 : "";
             const typoBtn =
               item.typography?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="typography" class="row-apply">Apply Typography Token</button>`
+                ? `<button data-id="${item.id}" data-target="typography" class="row-apply layer-button">Apply Typography Token</button>`
                 : "";
 
             const buttons = `<div class="layer-card__buttons">${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${borderBtn}${radiusBtn}${typoBtn}</div>`;
             return `<div class="layer-card ${isCollapsed ? "is-collapsed" : ""}" data-id="${item.id}">
               <div class="layer-card__header">
                 <div class="layer-card__title">${item.name || "Layer"}</div>
-                <div class="layer-card__actions">${highlight}${toggle}</div>
+                <div class="layer-card__actions">${layerApply}${highlight}${toggle}</div>
               </div>
               <div class="layer-card__body">
                 ${fillStatus || ""}
@@ -1014,6 +1012,26 @@
             } else {
               collapsedIds.delete(id);
             }
+          });
+        });
+
+        listEl.querySelectorAll(".layer-apply").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            if (btn.disabled) return;
+            const id = btn.getAttribute("data-id");
+            if (!id) return;
+            suppressLoadingOnce = true;
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: "apply-token-layer",
+                  nodeId: id,
+                  mode: getMode(),
+                  libraryId: getLibraryId(),
+                },
+              },
+              "*"
+            );
           });
         });
 
