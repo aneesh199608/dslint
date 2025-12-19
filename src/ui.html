@@ -7,13 +7,13 @@
       :root {
         font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        color: #0f172a;
-        background: #f8fafc;
+        color: #1e1e1e;
+        background: #ffffff;
       }
       body {
         margin: 0;
         padding: 16px;
-        background: #f8fafc;
+        background: #ffffff;
       }
       body.is-empty {
         background: #ffffff;
@@ -25,44 +25,244 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+        padding: 16px;
+        border: 2px solid #383838;
+        border-radius: 8px;
+        background: #ffffff;
       }
-      .row-flex {
+      .header-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
       }
-      .actions {
+      .header-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e1e1e;
+      }
+      .header-title h2 {
+        margin: 0;
+        font-size: inherit;
+        font-weight: inherit;
+      }
+      .header-title-icon {
+        width: 16px;
+        height: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .header-title-icon.is-hidden {
+        display: none;
+      }
+      .header-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+      }
+      .select-control {
+        border: 1px solid #d9d9d9;
+        border-radius: 8px;
+        padding: 4px 24px 4px 8px;
+        height: 24px;
+        font-size: 12px;
+        font-weight: 400;
+        color: #1e1e1e;
+        background: #ffffff;
+        line-height: 12px;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%231E1E1E' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 4px center;
+        background-size: 16px 16px;
+      }
+      .control-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #e4e4e7;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 6px 8px;
+        height: 24px;
+        font-size: 11px;
+        color: #18181b;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        line-height: 1;
+      }
+      .control-button svg {
+        width: 12px;
+        height: 12px;
+      }
+      .control-button img {
+        width: 12px;
+        height: 12px;
+        display: block;
+      }
+      .filter-menu {
+        position: relative;
+      }
+      .filter-menu summary {
+        list-style: none;
+      }
+      .filter-menu summary::-webkit-details-marker {
+        display: none;
+      }
+      .filter-icon-button {
+        border: 1px solid #e4e4e7;
+        background: #ffffff;
+        border-radius: 8px;
+        width: 24px;
+        height: 24px;
+        padding: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        box-sizing: border-box;
+      }
+      .filter-icon-button svg {
+        width: 12px;
+        height: 12px;
+      }
+      .filter-menu-content {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        background: #ffffff;
+        border: 1px solid #e4e4e7;
+        border-radius: 8px;
+        padding: 8px;
+        min-width: 180px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        z-index: 2;
         display: flex;
+        flex-direction: column;
         gap: 8px;
       }
-      .icon-button {
-        border: 1px solid #cbd5e1;
-        background: linear-gradient(#ffffff, #f8fafc);
-        border-radius: 8px;
-        padding: 6px 10px;
+      .filter-menu:not([open]) .filter-menu-content {
+        display: none;
+      }
+      .filter-menu-label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        color: #475569;
+      }
+      .filter-menu-select {
+        border: 1px solid #d9d9d9;
+        border-radius: 6px;
+        padding: 4px 6px;
+        height: 24px;
         font-size: 12px;
-        color: #0f172a;
-        cursor: pointer;
-        transition: background 120ms ease, border-color 120ms ease;
-      }
-      .icon-button:hover {
-        background: #eef2ff;
-        border-color: #94a3b8;
-      }
-      .icon-button:active {
-        background: #e2e8f0;
-      }
-      .card {
+        color: #1e1e1e;
         background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
       }
-      .card.success {
-        background: #f0fdf4;
+      .summary-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+      }
+      .summary-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #000000;
+      }
+      .summary-pill span {
+        font-weight: 600;
+      }
+      .summary-pill.applied {
+        background: #ebffee;
+      }
+      .summary-pill.missing {
+        background: #fee9e7;
+      }
+      .summary-pill.unsupported {
+        background: #fffbeb;
+      }
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: #f5f6fe;
+        flex-wrap: nowrap;
+      }
+      .filter-options {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: nowrap;
+        flex: 1;
+      }
+      .filter-option {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #1e1e1e;
+      }
+      .filter-option input {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid #2c2c2c;
+        background: #2c2c2c;
+        display: grid;
+        place-content: center;
+        margin: 0;
+      }
+      .filter-option input::after {
+        content: "";
+        width: 6px;
+        height: 3px;
+        border-left: 2px solid #f5f5f5;
+        border-bottom: 2px solid #f5f5f5;
+        transform: rotate(-45deg);
+        opacity: 0;
+      }
+      .filter-option input:checked::after {
+        opacity: 1;
+      }
+      .apply-button {
+        border: none;
+        background: #000000;
+        color: #f5f5f5;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        height: 24px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .apply-button:disabled {
+        opacity: 0.7;
+        cursor: default;
+      }
+      .status-message {
+        font-size: 12px;
+        color: #475569;
+      }
+      .status-message.is-hidden {
+        display: none;
       }
       .row {
         display: flex;
@@ -121,10 +321,6 @@
       .primary-button:active {
         transform: translateY(0);
         box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
-      }
-      h2 {
-        margin: 0 0 6px;
-        font-size: 16px;
       }
       p {
         margin: 0;
@@ -381,60 +577,93 @@
         <span>Scanning</span>
       </button>
     </div>
-    <div class="top-bar">
-      <div class="row-flex">
-        <div class="actions">
-          <select id="filter" class="icon-button" title="Filter results">
-            <option value="missing">Missing only</option>
+    <div class="top-bar card">
+      <div class="header-row">
+        <div class="header-title">
+          <h2 id="title">Inspecting selection...</h2>
+          <span id="status-icon" class="header-title-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="7" stroke="#02542D" stroke-width="1.6" />
+              <path d="M5 8.1L7.2 10.1L11 6.2" stroke="#02542D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+        </div>
+        <div class="header-controls">
+          <select id="filter" class="select-control" title="Filter results">
+            <option value="missing">Missing Only</option>
             <option value="all">All</option>
           </select>
-          <select id="theme" class="icon-button" title="Preferred mode">
-            <option value="Light">Light</option>
-            <option value="Dark">Dark</option>
-          </select>
-          <select id="library" class="icon-button" title="Libraries">
-            <option value="local">Created in this file</option>
-          </select>
+          <details class="filter-menu">
+            <summary class="filter-icon-button" title="Filter with a dropdown" aria-label="Filter with a dropdown">
+              <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M11 1.5H1L5 6.23V9.5L7 10.5V6.23L11 1.5Z" stroke="#1E1E1E" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </summary>
+            <div class="filter-menu-content">
+              <label class="filter-menu-label">
+                Mode
+                <select id="theme" class="filter-menu-select" title="Preferred mode">
+                  <option value="Light">Light</option>
+                  <option value="Dark">Dark</option>
+                </select>
+              </label>
+              <label class="filter-menu-label">
+                Libraries
+                <select id="library" class="filter-menu-select" title="Libraries">
+                  <option value="local">Created in this file</option>
+                </select>
+              </label>
+            </div>
+          </details>
+          <button
+            id="refresh"
+            class="control-button"
+            title="Refresh report"
+            aria-label="Refresh report"
+          >
+            <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M8.5 0.5L10.5 2.5M10.5 2.5L8.5 4.5M10.5 2.5L3.5 2.5C2.96957 2.5 2.46086 2.71071 2.08579 3.08579C1.71071 3.46086 1.5 3.96957 1.5 4.5V5.5M3.5 11.5L1.5 9.5M1.5 9.5L3.5 7.5M1.5 9.5L8.5 9.5C9.03043 9.5 9.53914 9.28929 9.91421 8.91421C10.2893 8.53914 10.5 8.03043 10.5 7.5V6.5" stroke="#1E1E1E" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Scan Again
+          </button>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-pill applied">
+          Applied: <span id="applied-count">--</span>
+        </div>
+        <div class="summary-pill missing">
+          Missing: <span id="missing-count">--</span>
+        </div>
+        <div class="summary-pill unsupported">
+          Unsupported: <span id="unsupported-count">--</span>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-options">
+          <label class="filter-option">
+            <input type="checkbox" id="chk-color" checked />
+            Color
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" id="chk-typography" checked />
+            Typography
+          </label>
+          <label class="filter-option">
+            <input type="checkbox" id="chk-spacing" checked />
+            Spacings
+          </label>
         </div>
         <button
-          id="refresh"
-          class="icon-button"
-          title="Refresh report"
-          aria-label="Refresh report"
-        >
-          Scan Again
-        </button>
-      </div>
-      <div class="row-flex">
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
-          <input type="checkbox" id="chk-fills" checked />
-          Fills
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
-          <input type="checkbox" id="chk-strokes" checked />
-          Strokes
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
-          <input type="checkbox" id="chk-typography" checked />
-          Typography
-        </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;">
-          <input type="checkbox" id="chk-spacing" checked />
-          Spacings
-        </label>
-        <button
           id="apply-all"
-          class="primary-button"
+          class="apply-button"
           title="Apply nearest tokens to all"
           aria-label="Apply nearest tokens to all"
         >
-          Apply Token to All
+          Apply Token To All
         </button>
       </div>
-    </div>
-    <div class="card">
-      <h2 id="title">Inspecting selection...</h2>
-      <p id="message">Select a single rectangle to inspect.</p>
+      <p id="message" class="status-message is-hidden">Select a single rectangle to inspect.</p>
     </div>
     <p id="dark-note" style="display:none;font-size:12px;color:#475569;margin:8px 0 0;">
       Using Dark mode—remember to set Figma's Appearance to Dark so tokens resolve correctly.
@@ -446,12 +675,15 @@
     <script>
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
+      const statusIconEl = document.getElementById("status-icon");
+      const appliedCountEl = document.getElementById("applied-count");
+      const missingCountEl = document.getElementById("missing-count");
+      const unsupportedCountEl = document.getElementById("unsupported-count");
       const refreshBtn = document.getElementById("refresh");
       const applyAllBtn = document.getElementById("apply-all");
       const themeSelect = document.getElementById("theme");
       const filterSelect = document.getElementById("filter");
-      const chkFills = document.getElementById("chk-fills");
-      const chkStrokes = document.getElementById("chk-strokes");
+      const chkColor = document.getElementById("chk-color");
       const chkTypography = document.getElementById("chk-typography");
       const chkSpacing = document.getElementById("chk-spacing");
       const cardEl = document.querySelector(".card");
@@ -464,7 +696,26 @@
       const startScanBtn = document.getElementById("start-scan");
       const startScanText = document.getElementById("start-scan-text");
       const loadingScreen = document.getElementById("loading-screen");
+      const filterMenu = document.querySelector(".filter-menu");
       let suppressLoadingOnce = false;
+      const defaultStartTitleHtml = startTitleEl ? startTitleEl.innerHTML : "";
+
+      const updateSummaryCounts = (message) => {
+        if (!appliedCountEl || !missingCountEl || !unsupportedCountEl) return;
+        const match = String(message).match(
+          /(\d+)\s+with tokens,\s+(\d+)\s+missing,\s+(\d+)\s+unsupported/i
+        );
+        if (match) {
+          appliedCountEl.textContent = match[1];
+          missingCountEl.textContent = match[2];
+          unsupportedCountEl.textContent = match[3];
+          return true;
+        }
+        appliedCountEl.textContent = "--";
+        missingCountEl.textContent = "--";
+        unsupportedCountEl.textContent = "--";
+        return false;
+      };
 
       const getMode = () => {
         const val = themeSelect?.value === "Dark" ? "Dark" : "Light";
@@ -494,6 +745,9 @@
           startScreen.setAttribute("aria-hidden", isEmpty ? "false" : "true");
         }
         if (isEmpty) {
+          if (startTitleEl && defaultStartTitleHtml) {
+            startTitleEl.innerHTML = defaultStartTitleHtml;
+          }
           setStartScanLoading(false);
         }
       };
@@ -674,10 +928,17 @@
         const data = event.data.pluginMessage;
         if (!data || data.type !== "status") return;
         const { title, message, state } = data.payload;
-        titleEl.textContent = title;
+        const displayTitle = title === "Scan complete" ? "Scan Complete" : title;
+        titleEl.textContent = displayTitle;
         messageEl.textContent = message;
-        if (startTitleEl) {
-          startTitleEl.textContent = title;
+        const hasCounts = updateSummaryCounts(message);
+        if (messageEl) {
+          const shouldHideMessage = Boolean(hasCounts) || !message;
+          messageEl.classList.toggle("is-hidden", shouldHideMessage);
+        }
+        if (statusIconEl) {
+          const isComplete = String(title).toLowerCase() === "scan complete";
+          statusIconEl.classList.toggle("is-hidden", !isComplete);
         }
         const isScanning = title === "Scanning...";
         setStartScanLoading(isScanning);
@@ -743,8 +1004,8 @@
               type: "apply-token-all",
               mode: getMode(),
               libraryId: getLibraryId(),
-              fills: chkFills?.checked !== false,
-              strokes: chkStrokes?.checked !== false,
+              fills: chkColor?.checked !== false,
+              strokes: chkColor?.checked !== false,
               typography: chkTypography?.checked !== false,
               spacing: chkSpacing?.checked !== false,
             },
@@ -778,6 +1039,20 @@
           },
           "*"
         );
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!filterMenu || !filterMenu.hasAttribute("open")) return;
+        if (!filterMenu.contains(event.target)) {
+          filterMenu.removeAttribute("open");
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (filterMenu?.hasAttribute("open")) {
+          filterMenu.removeAttribute("open");
+        }
       });
 
       // Debug runs once at startup via plugin; no UI control needed.
