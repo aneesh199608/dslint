@@ -60,6 +60,15 @@
       .header-title-icon.is-hidden {
         display: none;
       }
+      .status-spinner-ring {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(2, 84, 45, 0.25);
+        border-top-color: #02542d;
+        border-radius: 50%;
+        box-sizing: border-box;
+        animation: spin 0.9s linear infinite;
+      }
       .header-controls {
         display: inline-flex;
         align-items: center;
@@ -245,11 +254,11 @@
         background: #000000;
         color: #f5f5f5;
         border-radius: 8px;
-        padding: 6px 12px;
+        padding: 6px 16px;
         font-size: 12px;
         font-weight: 500;
         cursor: pointer;
-        height: 24px;
+        height: 28px;
         white-space: nowrap;
         flex-shrink: 0;
       }
@@ -587,6 +596,9 @@
               <path d="M5 8.1L7.2 10.1L11 6.2" stroke="#02542D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </span>
+          <span id="status-spinner" class="header-title-icon is-hidden" aria-hidden="true">
+            <span class="status-spinner-ring"></span>
+          </span>
         </div>
         <div class="header-controls">
           <select id="filter" class="select-control" title="Filter results">
@@ -676,6 +688,7 @@
       const titleEl = document.getElementById("title");
       const messageEl = document.getElementById("message");
       const statusIconEl = document.getElementById("status-icon");
+      const statusSpinnerEl = document.getElementById("status-spinner");
       const appliedCountEl = document.getElementById("applied-count");
       const missingCountEl = document.getElementById("missing-count");
       const unsupportedCountEl = document.getElementById("unsupported-count");
@@ -936,11 +949,14 @@
           const shouldHideMessage = Boolean(hasCounts) || !message;
           messageEl.classList.toggle("is-hidden", shouldHideMessage);
         }
+        const isComplete = String(title).toLowerCase() === "scan complete";
+        const isScanning = title === "Scanning";
         if (statusIconEl) {
-          const isComplete = String(title).toLowerCase() === "scan complete";
           statusIconEl.classList.toggle("is-hidden", !isComplete);
         }
-        const isScanning = title === "Scanning...";
+        if (statusSpinnerEl) {
+          statusSpinnerEl.classList.toggle("is-hidden", !isScanning);
+        }
         setStartScanLoading(isScanning);
         if (isScanning) {
           if (!suppressLoadingOnce) {
@@ -980,6 +996,15 @@
 
       refreshBtn?.addEventListener("click", () => {
         suppressLoadingOnce = true;
+        if (titleEl) {
+          titleEl.textContent = "Scanning";
+        }
+        if (statusIconEl) {
+          statusIconEl.classList.add("is-hidden");
+        }
+        if (statusSpinnerEl) {
+          statusSpinnerEl.classList.remove("is-hidden");
+        }
         parent.postMessage(
           { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
           "*"
