@@ -870,6 +870,35 @@
         setLibraryError(payload.error);
       };
 
+      const formatStatusMessage = (message) => {
+        if (!message) return "";
+        const normalized = String(message).trim();
+        const lower = normalized.toLowerCase();
+        if (lower.includes("no matching")) {
+          return "No match";
+        }
+        const colonIndex = normalized.indexOf(":");
+        if (colonIndex > -1) {
+          const prefix = normalized.slice(0, colonIndex).toLowerCase();
+          if (
+            prefix.includes("matches variable") ||
+            prefix.includes("using variable") ||
+            prefix.includes("matches style") ||
+            prefix.includes("using style")
+          ) {
+            return normalized.slice(colonIndex + 1).trim();
+          }
+        }
+        return normalized;
+      };
+
+      const getStatusColor = (state) => {
+        if (state === "found" || state === "applied") return "#16a34a";
+        if (state === "missing" || state === "error") return "#b91c1c";
+        if (state === "info") return "#d97706";
+        return "#475569";
+      };
+
       const renderList = (items) => {
         if (!listEl) return;
         if (!items || items.length === 0) {
@@ -886,12 +915,6 @@
 
         const rows = filtered
           .map((item) => {
-            const statusColor =
-              item.state === "found" || item.state === "applied"
-                ? "#16a34a"
-                : item.state === "error"
-                ? "#b91c1c"
-                : "#475569";
             const highlight = `<button data-id="${item.id}" class="row-highlight" title="Highlight in canvas">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3.5"/>
@@ -908,25 +931,25 @@
               </svg>
             </button>`;
             const fillStatus = item.fill
-              ? `<div class="layer-status" style="color:${item.fill.state === "missing" ? "#b91c1c" : statusColor};">Fill: ${item.fill.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.fill.state)};">Fill: ${formatStatusMessage(item.fill.message)}</div>`
               : "";
             const strokeStatus = item.stroke
-              ? `<div class="layer-status" style="color:${item.stroke.state === "missing" ? "#b91c1c" : statusColor};">Stroke: ${item.stroke.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.stroke.state)};">Stroke: ${formatStatusMessage(item.stroke.message)}</div>`
               : "";
             const paddingStatus = item.padding
-              ? `<div class="layer-status" style="color:${item.padding.state === "missing" ? "#b91c1c" : "#475569"};">Padding: ${item.padding.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.padding.state)};">Padding: ${formatStatusMessage(item.padding.message)}</div>`
               : "";
             const gapStatus = item.gap
-              ? `<div class="layer-status" style="color:${item.gap.state === "missing" ? "#b91c1c" : "#475569"};">Gap: ${item.gap.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.gap.state)};">Gap: ${formatStatusMessage(item.gap.message)}</div>`
               : "";
             const borderStatus = item.strokeWeight
-              ? `<div class="layer-status" style="color:${item.strokeWeight.state === "missing" ? "#b91c1c" : "#475569"};">Stroke weight: ${item.strokeWeight.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.strokeWeight.state)};">Stroke weight: ${formatStatusMessage(item.strokeWeight.message)}</div>`
               : "";
             const radiusStatus = item.cornerRadius
-              ? `<div class="layer-status" style="color:${item.cornerRadius.state === "missing" ? "#b91c1c" : "#475569"};">Corner radius: ${item.cornerRadius.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.cornerRadius.state)};">Corner radius: ${formatStatusMessage(item.cornerRadius.message)}</div>`
               : "";
             const typoStatus = item.typography
-              ? `<div class="layer-status" style="color:${item.typography.state === "missing" ? "#b91c1c" : statusColor};">Typography: ${item.typography.message}</div>`
+              ? `<div class="layer-status" style="color:${getStatusColor(item.typography.state)};">Typography: ${formatStatusMessage(item.typography.message)}</div>`
               : "";
 
             const fillBtn =
