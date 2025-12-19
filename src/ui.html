@@ -777,6 +777,7 @@
       const loadingScreen = document.getElementById("loading-screen");
       const filterMenu = document.querySelector(".filter-menu");
       let suppressLoadingOnce = false;
+      let isApplyingAll = false;
       const defaultStartTitleHtml = startTitleEl ? startTitleEl.innerHTML : "";
 
       const updateSummaryCounts = (message) => {
@@ -1101,7 +1102,22 @@
         const data = event.data.pluginMessage;
         if (!data || data.type !== "status") return;
         const { title, message, state } = data.payload;
-        const displayTitle = title === "Scan complete" ? "Scan Complete" : title;
+        const normalizedTitle = String(title).toLowerCase();
+        const isScanComplete = normalizedTitle === "scan complete";
+        const isApplyFailed = normalizedTitle.includes("apply failed");
+        const wasApplyingAll = isApplyingAll;
+        if (wasApplyingAll && !isScanComplete && !isApplyFailed) {
+          return;
+        }
+        if (wasApplyingAll && (isScanComplete || isApplyFailed)) {
+          isApplyingAll = false;
+        }
+        const displayTitle =
+          wasApplyingAll && isScanComplete
+            ? "Tokens Applied"
+            : title === "Scan complete"
+            ? "Scan Complete"
+            : title;
         titleEl.textContent = displayTitle;
         messageEl.textContent = message;
         const hasCounts = updateSummaryCounts(message);
@@ -1109,13 +1125,18 @@
           const shouldHideMessage = Boolean(hasCounts) || !message;
           messageEl.classList.toggle("is-hidden", shouldHideMessage);
         }
-        const isComplete = String(title).toLowerCase() === "scan complete";
-        const isScanning = title === "Scanning";
+        const normalizedDisplayTitle = String(displayTitle).toLowerCase();
+        const isComplete =
+          normalizedDisplayTitle === "scan complete" ||
+          normalizedDisplayTitle === "tokens applied";
+        const isScanning = normalizedDisplayTitle.startsWith("scanning");
+        const isApplying = normalizedDisplayTitle.startsWith("applying");
+        const isBusy = isScanning || isApplying;
         if (statusIconEl) {
           statusIconEl.classList.toggle("is-hidden", !isComplete);
         }
         if (statusSpinnerEl) {
-          statusSpinnerEl.classList.toggle("is-hidden", !isScanning);
+          statusSpinnerEl.classList.toggle("is-hidden", !isBusy);
         }
         setStartScanLoading(isScanning);
         if (isScanning) {
@@ -1183,6 +1204,16 @@
 
       applyAllBtn?.addEventListener("click", () => {
         suppressLoadingOnce = true;
+        isApplyingAll = true;
+        if (titleEl) {
+          titleEl.textContent = "Applying, standby";
+        }
+        if (statusIconEl) {
+          statusIconEl.classList.add("is-hidden");
+        }
+        if (statusSpinnerEl) {
+          statusSpinnerEl.classList.remove("is-hidden");
+        }
         parent.postMessage(
           {
             pluginMessage: {
