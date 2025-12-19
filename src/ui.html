@@ -362,6 +362,9 @@
       .layer-status {
         font-size: 12px;
       }
+      .layer-status--missing {
+        font-weight: 600;
+      }
       .layer-card__buttons {
         display: flex;
         align-items: center;
@@ -875,6 +878,9 @@
         if (lower.includes("no matching")) {
           return "No match";
         }
+        if (lower.includes("unsupported stroke list")) {
+          return "No match";
+        }
         const colonIndex = normalized.indexOf(":");
         if (colonIndex > -1) {
           const prefix = normalized.slice(0, colonIndex).toLowerCase();
@@ -888,6 +894,15 @@
           }
         }
         return normalized;
+      };
+
+      const formatStatusLine = (label, item) => {
+        if (!item) return "";
+        const value = formatStatusMessage(item.message);
+        if (item.state === "missing" && value) {
+          return `${label}: ${value} (token found)`;
+        }
+        return `${label}: ${value}`;
       };
 
       const getStatusColor = (state) => {
@@ -940,25 +955,25 @@
               hasMissing ? "" : "disabled"
             }>Apply Layer Tokens</button>`;
             const fillStatus = item.fill
-              ? `<div class="layer-status" style="color:${getStatusColor(item.fill.state)};">Fill: ${formatStatusMessage(item.fill.message)}</div>`
+              ? `<div class="layer-status${item.fill.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.fill.state)};">${formatStatusLine("Fill", item.fill)}</div>`
               : "";
             const strokeStatus = item.stroke
-              ? `<div class="layer-status" style="color:${getStatusColor(item.stroke.state)};">Stroke: ${formatStatusMessage(item.stroke.message)}</div>`
+              ? `<div class="layer-status${item.stroke.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.stroke.state)};">${formatStatusLine("Stroke", item.stroke)}</div>`
               : "";
             const paddingStatus = item.padding
-              ? `<div class="layer-status" style="color:${getStatusColor(item.padding.state)};">Padding: ${formatStatusMessage(item.padding.message)}</div>`
+              ? `<div class="layer-status${item.padding.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.padding.state)};">${formatStatusLine("Padding", item.padding)}</div>`
               : "";
             const gapStatus = item.gap
-              ? `<div class="layer-status" style="color:${getStatusColor(item.gap.state)};">Gap: ${formatStatusMessage(item.gap.message)}</div>`
+              ? `<div class="layer-status${item.gap.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.gap.state)};">${formatStatusLine("Gap", item.gap)}</div>`
               : "";
             const borderStatus = item.strokeWeight
-              ? `<div class="layer-status" style="color:${getStatusColor(item.strokeWeight.state)};">Stroke weight: ${formatStatusMessage(item.strokeWeight.message)}</div>`
+              ? `<div class="layer-status${item.strokeWeight.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.strokeWeight.state)};">${formatStatusLine("Stroke Weight", item.strokeWeight)}</div>`
               : "";
             const radiusStatus = item.cornerRadius
-              ? `<div class="layer-status" style="color:${getStatusColor(item.cornerRadius.state)};">Corner radius: ${formatStatusMessage(item.cornerRadius.message)}</div>`
+              ? `<div class="layer-status${item.cornerRadius.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.cornerRadius.state)};">${formatStatusLine("Corner Radius", item.cornerRadius)}</div>`
               : "";
             const typoStatus = item.typography
-              ? `<div class="layer-status" style="color:${getStatusColor(item.typography.state)};">Typography: ${formatStatusMessage(item.typography.message)}</div>`
+              ? `<div class="layer-status${item.typography.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.typography.state)};">${formatStatusLine("Typography", item.typography)}</div>`
               : "";
 
             const fillBtn =

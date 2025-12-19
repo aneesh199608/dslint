@@ -193,7 +193,7 @@ export const scanSelection = async (
         try {
           const style = await figma.getStyleByIdAsync(boundId);
           typography = {
-            message: `Using typography style: ${style?.name ?? "Text style"}${
+            message: `Using style: ${style?.name ?? "Text style"}${
               node.hasMissingFont ? " (fonts missing)" : ""
             }`,
             state: "found",
@@ -223,7 +223,7 @@ export const scanSelection = async (
         );
         if (match) {
           typography = {
-            message: `Matches typography style: ${match.variable.name}`,
+            message: `Matches style: ${match.variable.name}`,
             state: "missing",
             variableName: match.variable.name,
             styleId: match.variable.id,
@@ -285,7 +285,7 @@ export const scanSelection = async (
           } else {
             const parts = matches.map((m) => `${m.label}:${m.match!.name}`).join(" ");
             padding = {
-              message: `Padding matches tokens ${parts}`,
+              message: parts,
               state: "missing",
               variableName: matches.map((m) => m.match!.name).join(" / "),
             };
@@ -326,7 +326,7 @@ export const scanSelection = async (
             const match = await findSpacingVariable(spacing, libraryScope);
             if (match) {
               gap = {
-                message: `Gap matches token ${match.name}`,
+                message: match.name,
                 state: "missing",
                 variableName: match.name,
               };
@@ -401,7 +401,7 @@ export const scanSelection = async (
           strokeWeightInfo = { message: "Stroke weight unsupported (non-solid stroke)", state: "info" };
         } else if (boundWeightVariable || hasBoundAlias) {
           strokeWeightInfo = {
-            message: `Stroke weight using variable${boundWeightVariableName ? `: ${boundWeightVariableName}` : ""}`,
+            message: `Using variable: ${boundWeightVariableName ?? "Spacing variable"}`,
             state: "found",
             variableName: boundWeightVariableName,
           };
@@ -412,7 +412,7 @@ export const scanSelection = async (
             const match = await findSpacingVariable(weight, libraryScope);
             if (match) {
               strokeWeightInfo = {
-                message: `Stroke weight matches token ${match.name}`,
+                message: match.name,
                 state: "missing",
                 variableName: match.name,
               };
@@ -469,7 +469,7 @@ export const scanSelection = async (
             const match = await findSpacingVariable(radius, libraryScope);
             if (match) {
               cornerRadius = {
-                message: `Corner radius matches token ${match.name}`,
+                message: match.name,
                 state: "missing",
                 variableName: match.name,
               };
@@ -517,7 +517,7 @@ export const scanSelection = async (
                 })
                 .join(" ");
               cornerRadius = {
-                message: `Corner radius matches tokens ${parts}`,
+                message: parts,
                 state: "missing",
                 variableName: matches
                   .map((m) => (m.match ? m.match.name : ""))
