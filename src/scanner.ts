@@ -158,22 +158,24 @@ export const scanSelection = async (
 
   if (selection.length === 0) {
     sendStatus({
-      title: "Select a layer or frame to inspect.",
-      message: "Choose a single node or frame to scan for color tokens.",
+      title: "Select a Layer or Frame to inspect",
+      message: "",
       state: "info",
     });
-    figma.ui.postMessage({ type: "scan-results", payload: { items: [], mode: preferredModeName } });
+    figma.ui.postMessage({
+      type: "scan-results",
+      payload: { items: [], mode: preferredModeName, emptySelection: true },
+    });
     return [];
   }
 
+  sendStatus({
+    title: "Scanning...",
+    message: "Analyzing selection for tokens.",
+    state: "info",
+  });
+
   const nodes = gatherNodesWithPaints(selection);
-  if (nodes.length) {
-    sendStatus({
-      title: "Scanning...",
-      message: "Analyzing selection for tokens.",
-      state: "info",
-    });
-  }
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
@@ -569,6 +571,7 @@ export const scanSelection = async (
     payload: {
       items: results,
       mode: preferredModeName,
+      emptySelection: false,
     },
   });
 

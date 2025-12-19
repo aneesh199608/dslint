@@ -4,7 +4,7 @@
   "description": "Minimal color token checker for Figma",
   "main": "dist/code.js",
   "scripts": {
-    "build": "esbuild src/code.ts --bundle --format=iife --platform=browser --target=es2017 --outfile=dist/code.js && cp src/ui.html dist/ui.html",
+    "build": "esbuild src/code.ts --bundle --format=iife --platform=browser --target=es2017 --outfile=dist/code.js && cp src/ui.html dist/ui.html && mkdir -p dist/assets && cp src/assets/*.svg dist/assets/",
     "watch": "npm run build -- --watch"
   },
   "author": "",

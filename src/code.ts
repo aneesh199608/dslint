@@ -109,6 +109,14 @@ const handleScan = async (mode?: ModePreference, libraryId?: string) => {
 handleScan(DEFAULT_MODE).catch((err) => console.error("Initial scan failed", err));
 
 figma.ui.onmessage = async (msg) => {
+  if (msg?.type === "ui-ready") {
+    figma.ui.postMessage({
+      type: "selection-state",
+      payload: { hasSelection: figma.currentPage.selection.length > 0 },
+    });
+    return;
+  }
+
   if (msg?.type === "refresh") {
     await handleScan(msg.mode, msg.libraryId);
     return;
