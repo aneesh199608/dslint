@@ -1,5 +1,5 @@
 {
-  "name": "DSLint - Design System Tokenizer",
+  "name": "Design System Tokenizer",
   "id": "1577348358952883926",
   "api": "1.0.0",
   "main": "dist/code.js",
