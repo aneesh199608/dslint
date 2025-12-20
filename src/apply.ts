@@ -347,151 +347,152 @@ export const applyGapTokenToNode = async (
   });
 };
 
-export const applyStrokeWeightTokenToNode = async (
-  nodeId: string,
-  preferredModeName: ModePreference,
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
-) => {
-  const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
-  if (!node || !("strokeWeight" in node) || !("strokes" in node)) {
-    sendStatus({
-      title: "Unsupported selection",
-      message: "Stroke weight apply works on nodes with strokes.",
-      state: "error",
-    });
-    return;
-  }
-
-  const strokes = (node as GeometryMixin).strokes;
-  if (!Array.isArray(strokes) || strokes.length === 0) {
-    sendStatus({
-      title: "No stroke weight applied",
-      message: "No strokes detected to tokenize.",
-      state: "info",
-    });
-    return;
-  }
-
-  const first = strokes[0];
-  if (first.type !== "SOLID") {
-    sendStatus({
-      title: "Unsupported stroke type",
-      message: "Only solid strokes are supported for stroke weight tokenization.",
-      state: "info",
-    });
-    return;
-  }
-
-  const weight = (node as any).strokeWeight;
-  if (typeof weight !== "number" || weight <= 0) {
-    sendStatus({
-      title: "No stroke weight applied",
-      message: "Stroke weight is 0 or unset; nothing to tokenize.",
-      state: "info",
-    });
-    return;
-  }
-
-  const match = await findSpacingVariable(weight, libraryScope);
-  if (!match) {
-    sendStatus({
-      title: "No stroke weight token found",
-      message: "No matching spacing token for this stroke weight.",
-      state: "info",
-    });
-    return;
-  }
-
-  // Clear stroke style id if present to avoid conflicts.
-  const setStrokeStyleIdAsync = (node as any).setStrokeStyleIdAsync;
-  if (typeof setStrokeStyleIdAsync === "function") {
-    try {
-      await setStrokeStyleIdAsync.call(node, "");
-    } catch {
-      // ignore
-    }
-  }
-
-  // Attempt to bind at node-level and per-stroke path for robustness.
-  try {
-    (node as any).setBoundVariable?.("strokeWeight", match.id);
-  } catch {
-    // ignore binding errors
-  }
-  // If the node supports per-side stroke weights, bind those too to mimic Figma's UI controls.
-  const sideProps = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
-  for (const prop of sideProps) {
-    if (prop in (node as any)) {
-      try {
-        (node as any).setBoundVariable?.(prop, match.id);
-      } catch {
-        // ignore per-side binding errors
-      }
-    }
-  }
-  try {
-    (node as any).setBoundVariable?.("strokes/0/weight", match.id);
-  } catch {
-    // ignore binding errors; node-level binding may still work
-  }
-  try {
-    const current = (node as any).boundVariables ?? {};
-    const existingStrokeEntry = current.strokes?.[0] ?? {};
-    (node as any).boundVariables = {
-      ...current,
-      strokeWeight: { id: match.id, type: "VARIABLE_ALIAS" },
-      strokes: {
-        ...(current.strokes ?? {}),
-        0: { ...existingStrokeEntry, weight: { id: match.id, type: "VARIABLE_ALIAS" } },
-      },
-    };
-  } catch {
-    // ignore direct assignment failures
-  }
-
-  // Ensure strokes array persists the weight after potential style clear.
-  try {
-    const nextStrokes = Array.isArray(strokes) ? [...strokes] : [];
-    if (nextStrokes[0] && typeof nextStrokes[0] === "object") {
-      // Bind weight directly on the stroke entry so scans can see the alias.
-      const existingStrokeBound = (nextStrokes[0] as any).boundVariables ?? {};
-      nextStrokes[0] = {
-        ...nextStrokes[0],
-        weight: { id: match.id, type: "VARIABLE_ALIAS" },
-        boundVariables: {
-          ...existingStrokeBound,
-          weight: { id: match.id, type: "VARIABLE_ALIAS" },
-        },
-      };
-      (node as GeometryMixin).strokes = nextStrokes;
-      // Also keep the numeric strokeWeight in sync for display/rendering.
-      try {
-        (node as any).strokeWeight = weight;
-      } catch {
-        // ignore
-      }
-      // Sync per-side numeric values if present so the UI reflects the same weight everywhere.
-      const sideProps = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
-      for (const prop of sideProps) {
-        if (prop in (node as any)) {
-          try {
-            (node as any)[prop] = weight;
-          } catch {
-            // ignore per-side numeric sync
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore paint assignment issues
-  }
-
-  sendStatus({
-    title: "Stroke weight token applied",
-    message: `Applied stroke weight token: ${match.name}`,
-    state: "applied",
-  });
-};
+// Stroke weight tokenization disabled for this iteration.
+// export const applyStrokeWeightTokenToNode = async (
+//   nodeId: string,
+//   preferredModeName: ModePreference,
+//   libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+// ) => {
+//   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
+//   if (!node || !("strokeWeight" in node) || !("strokes" in node)) {
+//     sendStatus({
+//       title: "Unsupported selection",
+//       message: "Stroke weight apply works on nodes with strokes.",
+//       state: "error",
+//     });
+//     return;
+//   }
+//
+//   const strokes = (node as GeometryMixin).strokes;
+//   if (!Array.isArray(strokes) || strokes.length === 0) {
+//     sendStatus({
+//       title: "No stroke weight applied",
+//       message: "No strokes detected to tokenize.",
+//       state: "info",
+//     });
+//     return;
+//   }
+//
+//   const first = strokes[0];
+//   if (first.type !== "SOLID") {
+//     sendStatus({
+//       title: "Unsupported stroke type",
+//       message: "Only solid strokes are supported for stroke weight tokenization.",
+//       state: "info",
+//     });
+//     return;
+//   }
+//
+//   const weight = (node as any).strokeWeight;
+//   if (typeof weight !== "number" || weight <= 0) {
+//     sendStatus({
+//       title: "No stroke weight applied",
+//       message: "Stroke weight is 0 or unset; nothing to tokenize.",
+//       state: "info",
+//     });
+//     return;
+//   }
+//
+//   const match = await findSpacingVariable(weight, libraryScope);
+//   if (!match) {
+//     sendStatus({
+//       title: "No stroke weight token found",
+//       message: "No matching spacing token for this stroke weight.",
+//       state: "info",
+//     });
+//     return;
+//   }
+//
+//   // Clear stroke style id if present to avoid conflicts.
+//   const setStrokeStyleIdAsync = (node as any).setStrokeStyleIdAsync;
+//   if (typeof setStrokeStyleIdAsync === "function") {
+//     try {
+//       await setStrokeStyleIdAsync.call(node, "");
+//     } catch {
+//       // ignore
+//     }
+//   }
+//
+//   // Attempt to bind at node-level and per-stroke path for robustness.
+//   try {
+//     (node as any).setBoundVariable?.("strokeWeight", match.id);
+//   } catch {
+//     // ignore binding errors
+//   }
+//   // If the node supports per-side stroke weights, bind those too to mimic Figma's UI controls.
+//   const sideProps = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
+//   for (const prop of sideProps) {
+//     if (prop in (node as any)) {
+//       try {
+//         (node as any).setBoundVariable?.(prop, match.id);
+//       } catch {
+//         // ignore per-side binding errors
+//       }
+//     }
+//   }
+//   try {
+//     (node as any).setBoundVariable?.("strokes/0/weight", match.id);
+//   } catch {
+//     // ignore binding errors; node-level binding may still work
+//   }
+//   try {
+//     const current = (node as any).boundVariables ?? {};
+//     const existingStrokeEntry = current.strokes?.[0] ?? {};
+//     (node as any).boundVariables = {
+//       ...current,
+//       strokeWeight: { id: match.id, type: "VARIABLE_ALIAS" },
+//       strokes: {
+//         ...(current.strokes ?? {}),
+//         0: { ...existingStrokeEntry, weight: { id: match.id, type: "VARIABLE_ALIAS" } },
+//       },
+//     };
+//   } catch {
+//     // ignore direct assignment failures
+//   }
+//
+//   // Ensure strokes array persists the weight after potential style clear.
+//   try {
+//     const nextStrokes = Array.isArray(strokes) ? [...strokes] : [];
+//     if (nextStrokes[0] && typeof nextStrokes[0] === "object") {
+//       // Bind weight directly on the stroke entry so scans can see the alias.
+//       const existingStrokeBound = (nextStrokes[0] as any).boundVariables ?? {};
+//       nextStrokes[0] = {
+//         ...nextStrokes[0],
+//         weight: { id: match.id, type: "VARIABLE_ALIAS" },
+//         boundVariables: {
+//           ...existingStrokeBound,
+//           weight: { id: match.id, type: "VARIABLE_ALIAS" },
+//         },
+//       };
+//       (node as GeometryMixin).strokes = nextStrokes;
+//       // Also keep the numeric strokeWeight in sync for display/rendering.
+//       try {
+//         (node as any).strokeWeight = weight;
+//       } catch {
+//         // ignore
+//       }
+//       // Sync per-side numeric values if present so the UI reflects the same weight everywhere.
+//       const sideProps = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
+//       for (const prop of sideProps) {
+//         if (prop in (node as any)) {
+//           try {
+//             (node as any)[prop] = weight;
+//           } catch {
+//             // ignore per-side numeric sync
+//           }
+//         }
+//       }
+//     }
+//   } catch {
+//     // ignore paint assignment issues
+//   }
+//
+//   sendStatus({
+//     title: "Stroke weight token applied",
+//     message: `Applied stroke weight token: ${match.name}`,
+//     state: "applied",
+//   });
+// };
 
 export const applyCornerRadiusTokenToNode = async (
   nodeId: string,
@@ -706,9 +707,10 @@ export const applyAllMissing = async (
     if (opts?.spacing !== false && item.gap?.state === "missing") {
       await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
     }
-    if (opts?.spacing !== false && item.strokeWeight?.state === "missing") {
-      await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
-    }
+    // Stroke weight tokenization disabled for this iteration.
+    // if (opts?.spacing !== false && item.strokeWeight?.state === "missing") {
+    //   await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
+    // }
     if (opts?.spacing !== false && item.cornerRadius?.state === "missing") {
       await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
     }
@@ -748,9 +750,10 @@ export const applyAllMissingForNode = async (
   if (item.gap?.state === "missing") {
     await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
   }
-  if (item.strokeWeight?.state === "missing") {
-    await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
-  }
+  // Stroke weight tokenization disabled for this iteration.
+  // if (item.strokeWeight?.state === "missing") {
+  //   await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
+  // }
   if (item.cornerRadius?.state === "missing") {
     await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
   }

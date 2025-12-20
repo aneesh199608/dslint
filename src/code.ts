@@ -7,7 +7,6 @@ import {
   applyTypographyToNode,
   applyPaddingTokenToNode,
   applyGapTokenToNode,
-  applyStrokeWeightTokenToNode,
   applyCornerRadiusTokenToNode,
 } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
@@ -139,8 +138,9 @@ figma.ui.onmessage = async (msg) => {
         await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "gap") {
         await applyGapTokenToNode(msg.nodeId, getMode(msg.mode), scope);
-      } else if (msg.target === "strokeWeight") {
-        await applyStrokeWeightTokenToNode(msg.nodeId, getMode(msg.mode), scope);
+      // Stroke weight tokenization disabled for this iteration.
+      // } else if (msg.target === "strokeWeight") {
+      //   await applyStrokeWeightTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "cornerRadius") {
         await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else {

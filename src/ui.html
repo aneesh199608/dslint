@@ -949,7 +949,8 @@
               item.stroke?.state === "missing" ||
               item.padding?.state === "missing" ||
               item.gap?.state === "missing" ||
-              item.strokeWeight?.state === "missing" ||
+              // Stroke weight tokenization disabled for this iteration.
+              // item.strokeWeight?.state === "missing" ||
               item.cornerRadius?.state === "missing" ||
               item.typography?.state === "missing";
             const layerApply = `<button data-id="${item.id}" class="layer-apply layer-button" ${
@@ -967,9 +968,10 @@
             const gapStatus = item.gap
               ? `<div class="layer-status${item.gap.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.gap.state)};">${formatStatusLine("Gap", item.gap)}</div>`
               : "";
-            const borderStatus = item.strokeWeight
-              ? `<div class="layer-status${item.strokeWeight.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.strokeWeight.state)};">${formatStatusLine("Stroke Weight", item.strokeWeight)}</div>`
-              : "";
+            // Stroke weight tokenization disabled for this iteration.
+            // const borderStatus = item.strokeWeight
+            //   ? `<div class="layer-status${item.strokeWeight.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.strokeWeight.state)};">${formatStatusLine("Stroke Weight", item.strokeWeight)}</div>`
+            //   : "";
             const radiusStatus = item.cornerRadius
               ? `<div class="layer-status${item.cornerRadius.state === "missing" ? " layer-status--missing" : ""}" style="color:${getStatusColor(item.cornerRadius.state)};">${formatStatusLine("Corner Radius", item.cornerRadius)}</div>`
               : "";
@@ -993,10 +995,11 @@
               item.gap?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="gap" class="row-apply layer-button">Apply Gap Token</button>`
                 : "";
-            const borderBtn =
-              item.strokeWeight?.state === "missing"
-                ? `<button data-id="${item.id}" data-target="strokeWeight" class="row-apply layer-button">Apply Stroke Weight Token</button>`
-                : "";
+            // Stroke weight tokenization disabled for this iteration.
+            // const borderBtn =
+            //   item.strokeWeight?.state === "missing"
+            //     ? `<button data-id="${item.id}" data-target="strokeWeight" class="row-apply layer-button">Apply Stroke Weight Token</button>`
+            //     : "";
             const radiusBtn =
               item.cornerRadius?.state === "missing"
                 ? `<button data-id="${item.id}" data-target="cornerRadius" class="row-apply layer-button">Apply Corner Radius Token</button>`
@@ -1006,7 +1009,7 @@
                 ? `<button data-id="${item.id}" data-target="typography" class="row-apply layer-button">Apply Typography Token</button>`
                 : "";
 
-            const buttons = `<div class="layer-card__buttons">${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${borderBtn}${radiusBtn}${typoBtn}</div>`;
+            const buttons = `<div class="layer-card__buttons">${fillBtn}${strokeBtn}${paddingBtn}${gapBtn}${radiusBtn}${typoBtn}</div>`;
             return `<div class="layer-card ${isCollapsed ? "is-collapsed" : ""}" data-id="${item.id}">
               <div class="layer-card__header">
                 <div class="layer-card__title">${item.name || "Layer"}</div>
@@ -1017,7 +1020,6 @@
                 ${strokeStatus || ""}
                 ${paddingStatus || ""}
                 ${gapStatus || ""}
-                ${borderStatus || ""}
                 ${radiusStatus || ""}
                 ${typoStatus || ""}
                 ${buttons}

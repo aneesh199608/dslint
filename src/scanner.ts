@@ -140,7 +140,8 @@ const computeOverallState = (
     typography?.state,
     padding?.state,
     gap?.state,
-    strokeWeight?.state,
+    // Stroke weight tokenization disabled for this iteration.
+    // strokeWeight?.state,
     cornerRadius?.state,
   ].filter(Boolean) as StatusState[];
   if (states.some((s) => s === "missing")) return "missing";
@@ -338,94 +339,95 @@ export const scanSelection = async (
       }
     }
 
-    if ("strokeWeight" in node) {
-      const weight = (node as any).strokeWeight;
-      const strokes = (node as GeometryMixin).strokes;
-      const bound = (node as any).boundVariables;
-      const strokeEntry =
-        Array.isArray(strokes) && strokes[0] && typeof strokes[0] === "object"
-          ? (strokes[0] as any)
-          : null;
-      const strokeWeightAlias =
-        strokeEntry && typeof strokeEntry.weight === "object" && "type" in strokeEntry.weight
-          ? strokeEntry.weight
-          : null;
-
-      const candidateIds: (string | undefined)[] = [
-        typeof bound?.strokeWeight === "string" ? bound.strokeWeight : bound?.strokeWeight?.id,
-        typeof bound?.strokes?.[0]?.weight === "string"
-          ? (bound?.strokes?.[0]?.weight as string)
-          : bound?.strokes?.[0]?.weight?.id,
-        strokeWeightAlias?.type === "VARIABLE_ALIAS" ? strokeWeightAlias.id : undefined,
-        typeof strokeEntry?.boundVariables?.weight === "string"
-          ? (strokeEntry?.boundVariables?.weight as string)
-          : strokeEntry?.boundVariables?.weight?.id,
-        typeof bound?.strokes?.[0] === "string"
-          ? (bound?.strokes?.[0] as string)
-          : bound?.strokes?.[0]?.id, // consider if stroke-level binding is a FLOAT variable
-        typeof bound?.["strokes/0/weight"] === "string"
-          ? (bound?.["strokes/0/weight"] as string)
-          : (bound?.["strokes/0/weight"] as any)?.id,
-        typeof strokeEntry?.boundVariables?.strokeWeight === "string"
-          ? (strokeEntry?.boundVariables?.strokeWeight as string)
-          : strokeEntry?.boundVariables?.strokeWeight?.id,
-      ];
-
-      const hasBoundAlias =
-        candidateIds.some(Boolean) || strokeWeightAlias?.type === "VARIABLE_ALIAS";
-
-      let boundWeightVariable: Variable | null = null;
-      let boundWeightVariableName: string | undefined;
-      for (const cid of candidateIds) {
-        if (!cid) continue;
-        try {
-          const variable = await figma.variables.getVariableByIdAsync(cid);
-          if (variable && variable.resolvedType === "FLOAT") {
-            boundWeightVariable = variable;
-            boundWeightVariableName = variable.name;
-            break;
-          }
-        } catch {
-          // ignore lookup errors; fall back to alias detection
-        }
-      }
-
-      if (!Array.isArray(strokes) || strokes.length === 0) {
-        // No usable strokes; show info only if weight > 0.
-        if (typeof weight === "number" && weight > 0) {
-          strokeWeightInfo = { message: "Stroke present but unsupported stroke list", state: "info" };
-        }
-      } else {
-        const firstStroke = strokes[0];
-        if (firstStroke.type !== "SOLID") {
-          strokeWeightInfo = { message: "Stroke weight unsupported (non-solid stroke)", state: "info" };
-        } else if (boundWeightVariable || hasBoundAlias) {
-          strokeWeightInfo = {
-            message: `Using variable: ${boundWeightVariableName ?? "Spacing variable"}`,
-            state: "found",
-            variableName: boundWeightVariableName,
-          };
-        } else if (typeof weight === "number") {
-          if (isZero(weight)) {
-            strokeWeightInfo = undefined;
-          } else {
-            const match = await findSpacingVariable(weight, libraryScope);
-            if (match) {
-              strokeWeightInfo = {
-                message: match.name,
-                state: "missing",
-                variableName: match.name,
-              };
-            } else {
-              strokeWeightInfo = {
-                message: "Stroke weight has no matching token",
-                state: "info",
-              };
-            }
-          }
-        }
-      }
-    }
+    // Stroke weight tokenization disabled for this iteration.
+    // if ("strokeWeight" in node) {
+    //   const weight = (node as any).strokeWeight;
+    //   const strokes = (node as GeometryMixin).strokes;
+    //   const bound = (node as any).boundVariables;
+    //   const strokeEntry =
+    //     Array.isArray(strokes) && strokes[0] && typeof strokes[0] === "object"
+    //       ? (strokes[0] as any)
+    //       : null;
+    //   const strokeWeightAlias =
+    //     strokeEntry && typeof strokeEntry.weight === "object" && "type" in strokeEntry.weight
+    //       ? strokeEntry.weight
+    //       : null;
+    //
+    //   const candidateIds: (string | undefined)[] = [
+    //     typeof bound?.strokeWeight === "string" ? bound.strokeWeight : bound?.strokeWeight?.id,
+    //     typeof bound?.strokes?.[0]?.weight === "string"
+    //       ? (bound?.strokes?.[0]?.weight as string)
+    //       : bound?.strokes?.[0]?.weight?.id,
+    //     strokeWeightAlias?.type === "VARIABLE_ALIAS" ? strokeWeightAlias.id : undefined,
+    //     typeof strokeEntry?.boundVariables?.weight === "string"
+    //       ? (strokeEntry?.boundVariables?.weight as string)
+    //       : strokeEntry?.boundVariables?.weight?.id,
+    //     typeof bound?.strokes?.[0] === "string"
+    //       ? (bound?.strokes?.[0] as string)
+    //       : bound?.strokes?.[0]?.id, // consider if stroke-level binding is a FLOAT variable
+    //     typeof bound?.["strokes/0/weight"] === "string"
+    //       ? (bound?.["strokes/0/weight"] as string)
+    //       : (bound?.["strokes/0/weight"] as any)?.id,
+    //     typeof strokeEntry?.boundVariables?.strokeWeight === "string"
+    //       ? (strokeEntry?.boundVariables?.strokeWeight as string)
+    //       : strokeEntry?.boundVariables?.strokeWeight?.id,
+    //   ];
+    //
+    //   const hasBoundAlias =
+    //     candidateIds.some(Boolean) || strokeWeightAlias?.type === "VARIABLE_ALIAS";
+    //
+    //   let boundWeightVariable: Variable | null = null;
+    //   let boundWeightVariableName: string | undefined;
+    //   for (const cid of candidateIds) {
+    //     if (!cid) continue;
+    //     try {
+    //       const variable = await figma.variables.getVariableByIdAsync(cid);
+    //       if (variable && variable.resolvedType === "FLOAT") {
+    //         boundWeightVariable = variable;
+    //         boundWeightVariableName = variable.name;
+    //         break;
+    //       }
+    //     } catch {
+    //       // ignore lookup errors; fall back to alias detection
+    //     }
+    //   }
+    //
+    //   if (!Array.isArray(strokes) || strokes.length === 0) {
+    //     // No usable strokes; show info only if weight > 0.
+    //     if (typeof weight === "number" && weight > 0) {
+    //       strokeWeightInfo = { message: "Stroke present but unsupported stroke list", state: "info" };
+    //     }
+    //   } else {
+    //     const firstStroke = strokes[0];
+    //     if (firstStroke.type !== "SOLID") {
+    //       strokeWeightInfo = { message: "Stroke weight unsupported (non-solid stroke)", state: "info" };
+    //     } else if (boundWeightVariable || hasBoundAlias) {
+    //       strokeWeightInfo = {
+    //         message: `Using variable: ${boundWeightVariableName ?? "Spacing variable"}`,
+    //         state: "found",
+    //         variableName: boundWeightVariableName,
+    //       };
+    //     } else if (typeof weight === "number") {
+    //       if (isZero(weight)) {
+    //         strokeWeightInfo = undefined;
+    //       } else {
+    //         const match = await findSpacingVariable(weight, libraryScope);
+    //         if (match) {
+    //           strokeWeightInfo = {
+    //             message: match.name,
+    //             state: "missing",
+    //             variableName: match.name,
+    //           };
+    //         } else {
+    //           strokeWeightInfo = {
+    //             message: "Stroke weight has no matching token",
+    //             state: "info",
+    //           };
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     if ("cornerRadius" in node) {
       const bindable = typeof (node as any).setBoundVariable === "function";
