@@ -1,21 +1,40 @@
 import { sendStatus } from "./messages";
-import { findNearestColorVariable, resolveColorForMode } from "./variables";
+import { findClosestColorVariable, findNearestColorVariable, resolveColorForMode } from "./variables";
 import { scanSelection } from "./scanner";
 import {
+  findClosestTypographyVariable,
   findMatchingTypographyVariable,
   getTypography,
   loadFontsForTypography,
   loadAllNodeFonts,
 } from "./typography";
-import { findSpacingVariable } from "./spacing";
-import type { LibraryScope, ModePreference } from "./types";
+import { DEFAULT_SPACING_TOLERANCE, findNearestSpacingVariable, findSpacingVariable } from "./spacing";
+import type { LibraryScope, MatchSettings, ModePreference } from "./types";
 import { LOCAL_LIBRARY_OPTION } from "./libraries";
+
+const resolveSpacingToken = async (
+  value: number,
+  libraryScope: LibraryScope,
+  allowClosestMatch: boolean
+) => {
+  const exact = await findSpacingVariable(value, libraryScope);
+  if (exact) return { variable: exact, diff: 0, isClosest: false };
+  if (!allowClosestMatch) return null;
+  const nearest = await findNearestSpacingVariable(
+    value,
+    DEFAULT_SPACING_TOLERANCE,
+    libraryScope
+  );
+  if (!nearest) return null;
+  return { variable: nearest.variable, diff: nearest.diff, isClosest: true };
+};
 
 export const applyNearestTokenToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
   target: "fill" | "stroke" = "fill",
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  settings?: MatchSettings
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node) {
@@ -59,17 +78,25 @@ export const applyNearestTokenToNode = async (
   }
 
   const paintOpacity = typeof first.opacity === "number" ? first.opacity : 1;
-  const nearestVariable = await findNearestColorVariable(
+  const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+  const exactVariable = await findNearestColorVariable(
     first.color,
     paintOpacity,
     preferredModeName,
     libraryScope
   );
+  const closestMatch =
+    !exactVariable && allowClosestMatch
+      ? await findClosestColorVariable(first.color, paintOpacity, preferredModeName, libraryScope)
+      : null;
+  const resolvedVariable = exactVariable ?? closestMatch?.variable ?? null;
 
-  if (!nearestVariable) {
+  if (!resolvedVariable) {
     sendStatus({
       title: "No tokens found",
-      message: "No exact color token match found (requires matching color and opacity).",
+      message: allowClosestMatch
+        ? "No exact or nearest color token match found (requires matching color and opacity)."
+        : "No exact color token match found (requires matching color and opacity).",
       state: "error",
     });
     return;
@@ -79,7 +106,7 @@ export const applyNearestTokenToNode = async (
   const alreadyBound =
     (typeof first.boundVariables?.color === "string"
       ? first.boundVariables?.color
-      : first.boundVariables?.color?.id) === nearestVariable.id;
+      : first.boundVariables?.color?.id) === resolvedVariable.id;
 
   if (alreadyBound) {
     sendStatus({
@@ -90,7 +117,7 @@ export const applyNearestTokenToNode = async (
     return;
   }
 
-  const resolved = await resolveColorForMode(nearestVariable, preferredModeName);
+  const resolved = await resolveColorForMode(resolvedVariable, preferredModeName);
   const variableAlpha = resolved?.a ?? 1;
 
   // If the token carries alpha, use it directly (not multiplied by the existing paint opacity).
@@ -108,7 +135,7 @@ export const applyNearestTokenToNode = async (
     opacity: nextOpacity,
     boundVariables: {
       ...(first.boundVariables ?? {}),
-      color: { id: nearestVariable.id, type: "VARIABLE_ALIAS" },
+      color: { id: resolvedVariable.id, type: "VARIABLE_ALIAS" },
     },
   };
 
@@ -125,7 +152,7 @@ export const applyNearestTokenToNode = async (
     (node as GeometryMixin).fills = [updatedPaint];
     // Also bind explicitly so node.boundVariables reflects the change immediately.
     try {
-      (node as any).setBoundVariable?.("fills/0/color", nearestVariable.id);
+      (node as any).setBoundVariable?.("fills/0/color", resolvedVariable.id);
     } catch {
       // Swallow; the paint-level boundVariables above still applies the token.
     }
@@ -140,7 +167,7 @@ export const applyNearestTokenToNode = async (
     }
     (node as GeometryMixin).strokes = [updatedPaint];
     try {
-      (node as any).setBoundVariable?.("strokes/0/color", nearestVariable.id);
+      (node as any).setBoundVariable?.("strokes/0/color", resolvedVariable.id);
     } catch {
       // Ignore; paint-level binding remains.
     }
@@ -148,18 +175,21 @@ export const applyNearestTokenToNode = async (
 
   sendStatus({
     title: "Token applied",
-    message: `Applied ${target} token: ${nearestVariable.name}`,
+    message: `Applied ${target} token: ${resolvedVariable.name}${
+      closestMatch ? " (nearest match)" : ""
+    }`,
     state: "applied",
   });
 
   // Refresh UI so the row updates to "Using variable" after apply.
-  await scanSelection(preferredModeName);
+  await scanSelection(preferredModeName, libraryScope, settings);
 };
 
 export const applyPaddingTokenToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  settings?: MatchSettings
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || !("paddingLeft" in node)) {
@@ -197,7 +227,8 @@ export const applyPaddingTokenToNode = async (
       });
       return;
     }
-    const match = await findSpacingVariable(pl, libraryScope);
+    const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+    const match = await resolveSpacingToken(pl, libraryScope, allowClosestMatch);
     if (!match) {
       sendStatus({
         title: "No padding token found",
@@ -207,13 +238,15 @@ export const applyPaddingTokenToNode = async (
       return;
     }
 
-    node.setBoundVariable("paddingLeft", match);
-    node.setBoundVariable("paddingRight", match);
-    node.setBoundVariable("paddingTop", match);
-    node.setBoundVariable("paddingBottom", match);
+    node.setBoundVariable("paddingLeft", match.variable);
+    node.setBoundVariable("paddingRight", match.variable);
+    node.setBoundVariable("paddingTop", match.variable);
+    node.setBoundVariable("paddingBottom", match.variable);
     sendStatus({
       title: "Padding token applied",
-      message: `Applied padding token: ${match.name}`,
+      message: `Applied padding token: ${match.variable.name}${
+        match.isClosest ? " (nearest match)" : ""
+      }`,
       state: "applied",
     });
     return;
@@ -221,8 +254,9 @@ export const applyPaddingTokenToNode = async (
 
   const isHorizontal = pl === pr && pt === pb;
   if (isHorizontal) {
-    const hVar = pl > 0 ? await findSpacingVariable(pl, libraryScope) : null;
-    const vVar = pt > 0 ? await findSpacingVariable(pt, libraryScope) : null;
+    const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+    const hVar = pl > 0 ? await resolveSpacingToken(pl, libraryScope, allowClosestMatch) : null;
+    const vVar = pt > 0 ? await resolveSpacingToken(pt, libraryScope, allowClosestMatch) : null;
     if (!hVar && !vVar) {
       sendStatus({
         title: "No padding tokens found",
@@ -233,12 +267,12 @@ export const applyPaddingTokenToNode = async (
     }
 
     if (hVar) {
-      node.setBoundVariable("paddingLeft", hVar);
-      node.setBoundVariable("paddingRight", hVar);
+      node.setBoundVariable("paddingLeft", hVar.variable);
+      node.setBoundVariable("paddingRight", hVar.variable);
     }
     if (vVar) {
-      node.setBoundVariable("paddingTop", vVar);
-      node.setBoundVariable("paddingBottom", vVar);
+      node.setBoundVariable("paddingTop", vVar.variable);
+      node.setBoundVariable("paddingBottom", vVar.variable);
     }
     sendStatus({
       title: "Padding tokens applied",
@@ -249,10 +283,11 @@ export const applyPaddingTokenToNode = async (
   }
 
   // Per-side binding if possible.
-  const topVar = pt > 0 ? await findSpacingVariable(pt, libraryScope) : null;
-  const rightVar = pr > 0 ? await findSpacingVariable(pr, libraryScope) : null;
-  const bottomVar = pb > 0 ? await findSpacingVariable(pb, libraryScope) : null;
-  const leftVar = pl > 0 ? await findSpacingVariable(pl, libraryScope) : null;
+  const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+  const topVar = pt > 0 ? await resolveSpacingToken(pt, libraryScope, allowClosestMatch) : null;
+  const rightVar = pr > 0 ? await resolveSpacingToken(pr, libraryScope, allowClosestMatch) : null;
+  const bottomVar = pb > 0 ? await resolveSpacingToken(pb, libraryScope, allowClosestMatch) : null;
+  const leftVar = pl > 0 ? await resolveSpacingToken(pl, libraryScope, allowClosestMatch) : null;
 
   if (!topVar && !rightVar && !bottomVar && !leftVar) {
     sendStatus({
@@ -263,10 +298,10 @@ export const applyPaddingTokenToNode = async (
     return;
   }
 
-  if (topVar) node.setBoundVariable("paddingTop", topVar);
-  if (rightVar) node.setBoundVariable("paddingRight", rightVar);
-  if (bottomVar) node.setBoundVariable("paddingBottom", bottomVar);
-  if (leftVar) node.setBoundVariable("paddingLeft", leftVar);
+  if (topVar) node.setBoundVariable("paddingTop", topVar.variable);
+  if (rightVar) node.setBoundVariable("paddingRight", rightVar.variable);
+  if (bottomVar) node.setBoundVariable("paddingBottom", bottomVar.variable);
+  if (leftVar) node.setBoundVariable("paddingLeft", leftVar.variable);
 
   sendStatus({
     title: "Padding tokens applied",
@@ -278,7 +313,8 @@ export const applyPaddingTokenToNode = async (
 export const applyGapTokenToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  settings?: MatchSettings
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   if (!node || !("itemSpacing" in node) || !("layoutMode" in node)) {
@@ -328,7 +364,8 @@ export const applyGapTokenToNode = async (
     return;
   }
 
-  const match = await findSpacingVariable(spacing, libraryScope);
+  const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+  const match = await resolveSpacingToken(spacing, libraryScope, allowClosestMatch);
   if (!match) {
     sendStatus({
       title: "No gap token found",
@@ -338,11 +375,13 @@ export const applyGapTokenToNode = async (
     return;
   }
 
-  (node as any).setBoundVariable("itemSpacing", match);
+  (node as any).setBoundVariable("itemSpacing", match.variable);
 
   sendStatus({
     title: "Gap token applied",
-    message: `Applied gap token: ${match.name}`,
+    message: `Applied gap token: ${match.variable.name}${
+      match.isClosest ? " (nearest match)" : ""
+    }`,
     state: "applied",
   });
 };
@@ -497,7 +536,8 @@ export const applyGapTokenToNode = async (
 export const applyCornerRadiusTokenToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  settings?: MatchSettings
 ) => {
   const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
   const canBindCornerRadius = !!node && "cornerRadius" in node && typeof (node as any).setBoundVariable === "function";
@@ -557,7 +597,7 @@ export const applyCornerRadiusTokenToNode = async (
     }
   };
 
-  const applyVariable = async (variable: Variable) => {
+  const applyVariable = async (variable: Variable, isClosest: boolean) => {
     const propsBound: string[] = [];
     if (radiusValue !== figma.mixed) {
       // Uniform radius: bind to cornerRadius and to all corners for consistency.
@@ -613,7 +653,9 @@ export const applyCornerRadiusTokenToNode = async (
     }
     sendStatus({
       title: "Corner radius token applied",
-      message: `Applied corner radius token: ${variable.name}`,
+      message: `Applied corner radius token: ${variable.name}${
+        isClosest ? " (nearest match)" : ""
+      }`,
       state: "applied",
     });
   };
@@ -628,9 +670,10 @@ export const applyCornerRadiusTokenToNode = async (
       return;
     }
 
-    const match = await findSpacingVariable(radiusValue, libraryScope);
+    const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+    const match = await resolveSpacingToken(radiusValue, libraryScope, allowClosestMatch);
     if (match) {
-      await applyVariable(match);
+      await applyVariable(match.variable, match.isClosest);
       return;
     }
 
@@ -662,9 +705,10 @@ export const applyCornerRadiusTokenToNode = async (
 
     let appliedAny = false;
     for (const c of applicable) {
-      const match = await findSpacingVariable(c.value as number, libraryScope);
+      const allowClosestMatch = Boolean(settings?.allowClosestMatch);
+      const match = await resolveSpacingToken(c.value as number, libraryScope, allowClosestMatch);
       if (match) {
-        await bindCorner(c.prop, match.id);
+        await bindCorner(c.prop, match.variable);
         appliedAny = true;
       }
     }
@@ -689,45 +733,47 @@ export const applyCornerRadiusTokenToNode = async (
 export const applyAllMissing = async (
   preferredModeName: ModePreference,
   libraryScope: LibraryScope,
-  opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean; typography?: boolean }
+  opts?: { fills?: boolean; strokes?: boolean; spacing?: boolean; typography?: boolean },
+  settings?: MatchSettings
 ) => {
-  const results = await scanSelection(preferredModeName, libraryScope);
+  const results = await scanSelection(preferredModeName, libraryScope, settings);
   if (!results.length) return;
 
   for (const item of results) {
     if (opts?.fills !== false && item.fill?.state === "missing") {
-      await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope);
+      await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope, settings);
     }
     if (opts?.strokes !== false && item.stroke?.state === "missing") {
-      await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope);
+      await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope, settings);
     }
     if (opts?.spacing !== false && item.padding?.state === "missing") {
-      await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope);
+      await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope, settings);
     }
     if (opts?.spacing !== false && item.gap?.state === "missing") {
-      await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
+      await applyGapTokenToNode(item.id, preferredModeName, libraryScope, settings);
     }
     // Stroke weight tokenization disabled for this iteration.
     // if (opts?.spacing !== false && item.strokeWeight?.state === "missing") {
     //   await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
     // }
     if (opts?.spacing !== false && item.cornerRadius?.state === "missing") {
-      await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
+      await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope, settings);
     }
     if (opts?.typography !== false && item.typography?.state === "missing") {
-      await applyTypographyToNode(item.id, preferredModeName, libraryScope);
+      await applyTypographyToNode(item.id, preferredModeName, libraryScope, settings);
     }
   }
 
-  await scanSelection(preferredModeName, libraryScope);
+  await scanSelection(preferredModeName, libraryScope, settings);
 };
 
 export const applyAllMissingForNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope
+  libraryScope: LibraryScope,
+  settings?: MatchSettings
 ) => {
-  const results = await scanSelection(preferredModeName, libraryScope);
+  const results = await scanSelection(preferredModeName, libraryScope, settings);
   const item = results.find((r) => r.id === nodeId);
   if (!item) {
     sendStatus({
@@ -739,33 +785,34 @@ export const applyAllMissingForNode = async (
   }
 
   if (item.fill?.state === "missing") {
-    await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope);
+    await applyNearestTokenToNode(item.id, preferredModeName, "fill", libraryScope, settings);
   }
   if (item.stroke?.state === "missing") {
-    await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope);
+    await applyNearestTokenToNode(item.id, preferredModeName, "stroke", libraryScope, settings);
   }
   if (item.padding?.state === "missing") {
-    await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope);
+    await applyPaddingTokenToNode(item.id, preferredModeName, libraryScope, settings);
   }
   if (item.gap?.state === "missing") {
-    await applyGapTokenToNode(item.id, preferredModeName, libraryScope);
+    await applyGapTokenToNode(item.id, preferredModeName, libraryScope, settings);
   }
   // Stroke weight tokenization disabled for this iteration.
   // if (item.strokeWeight?.state === "missing") {
   //   await applyStrokeWeightTokenToNode(item.id, preferredModeName, libraryScope);
   // }
   if (item.cornerRadius?.state === "missing") {
-    await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope);
+    await applyCornerRadiusTokenToNode(item.id, preferredModeName, libraryScope, settings);
   }
   if (item.typography?.state === "missing") {
-    await applyTypographyToNode(item.id, preferredModeName, libraryScope);
+    await applyTypographyToNode(item.id, preferredModeName, libraryScope, settings);
   }
 };
 
 export const applyTypographyToNode = async (
   nodeId: string,
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  settings?: MatchSettings
 ) => {
   try {
     const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode | null;
@@ -797,22 +844,39 @@ export const applyTypographyToNode = async (
       return;
     }
 
+    const allowClosestMatch = Boolean(settings?.allowClosestMatch);
     const match = await findMatchingTypographyVariable(
       node,
       preferredModeName,
       libraryScope,
       typoInfo.value
     );
-    if (!match) {
+    const closest = !match && allowClosestMatch
+      ? await findClosestTypographyVariable(
+          node,
+          preferredModeName,
+          libraryScope,
+          typoInfo.value
+        )
+      : null;
+    const resolvedMatch = match ?? closest;
+
+    if (!resolvedMatch) {
       sendStatus({
         title: "No typography token found",
-        message: "No matching text style for this typography.",
+        message: allowClosestMatch
+          ? "No exact or nearest text style for this typography."
+          : "No matching text style for this typography.",
         state: "info",
       });
       return;
     }
 
-    if (node.textStyleId && node.textStyleId !== figma.mixed && node.textStyleId === match.variable.id) {
+    if (
+      node.textStyleId &&
+      node.textStyleId !== figma.mixed &&
+      node.textStyleId === resolvedMatch.variable.id
+    ) {
       sendStatus({
         title: "Typography already applied",
         message: "This text is already bound to that text style.",
@@ -822,18 +886,22 @@ export const applyTypographyToNode = async (
     }
 
     await loadFontsForTypography(node, {
-      fontFamily: (match.variable as any).fontName?.family ?? typoInfo.value.fontFamily,
-      fontStyle: (match.variable as any).fontName?.style ?? typoInfo.value.fontStyle,
+      fontFamily: (resolvedMatch.variable as any).fontName?.family ?? typoInfo.value.fontFamily,
+      fontStyle: (resolvedMatch.variable as any).fontName?.style ?? typoInfo.value.fontStyle,
     });
     await loadAllNodeFonts(node);
 
     let applied = false;
     try {
       if (typeof (node as any).setRangeTextStyleIdAsync === "function") {
-        await (node as any).setRangeTextStyleIdAsync(0, node.characters.length, match.variable.id);
+        await (node as any).setRangeTextStyleIdAsync(
+          0,
+          node.characters.length,
+          resolvedMatch.variable.id
+        );
         applied = true;
       } else if (typeof node.setRangeTextStyleId === "function") {
-        node.setRangeTextStyleId(0, node.characters.length, match.variable.id);
+        node.setRangeTextStyleId(0, node.characters.length, resolvedMatch.variable.id);
         applied = true;
       }
     } catch (err) {
@@ -843,10 +911,10 @@ export const applyTypographyToNode = async (
     if (!applied) {
       try {
         if (typeof (node as any).setTextStyleIdAsync === "function") {
-          await (node as any).setTextStyleIdAsync(match.variable.id);
+          await (node as any).setTextStyleIdAsync(resolvedMatch.variable.id);
           applied = true;
         } else {
-          (node as any).textStyleId = match.variable.id;
+          (node as any).textStyleId = resolvedMatch.variable.id;
           applied = true;
         }
       } catch (err) {
@@ -863,15 +931,17 @@ export const applyTypographyToNode = async (
       });
       console.error("Typography apply failed", {
         nodeId,
-        styleId: match.variable.id,
-        styleName: match.variable.name,
+        styleId: resolvedMatch.variable.id,
+        styleName: resolvedMatch.variable.name,
       });
       return;
     }
 
     sendStatus({
       title: "Typography token applied",
-      message: `Applied typography style: ${match.variable.name}`,
+      message: `Applied typography style: ${resolvedMatch.variable.name}${
+        closest ? " (nearest match)" : ""
+      }`,
       state: "applied",
     });
   } catch (error) {

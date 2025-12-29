@@ -44,6 +44,7 @@
         font-size: 16px;
         font-weight: 600;
         color: #1e1e1e;
+        white-space: nowrap;
       }
       .header-title h2 {
         margin: 0;
@@ -215,9 +216,9 @@
       }
       .filter-bar {
         display: flex;
-        align-items: center;
+        align-items: stretch;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
         padding: 8px 12px;
         border-radius: 8px;
         background: #f5f6fe;
@@ -225,10 +226,17 @@
       }
       .filter-options {
         display: flex;
-        align-items: center;
-        gap: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
         flex-wrap: nowrap;
         flex: 1;
+      }
+      .filter-checkboxes {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
       }
       .filter-option {
         display: inline-flex;
@@ -236,6 +244,61 @@
         gap: 6px;
         font-size: 12px;
         color: #1e1e1e;
+      }
+      .toggle-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #18181b;
+        cursor: pointer;
+        user-select: none;
+      }
+      .toggle-input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+      }
+      .toggle-switch {
+        width: 28px;
+        height: 16px;
+        border-radius: 999px;
+        border: 1px solid #2c2c2c;
+        background: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 2px;
+        box-sizing: border-box;
+        position: relative;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+      .toggle-switch::after {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: #18181b;
+        box-shadow: 0 3px 5px -2px rgba(0, 0, 0, 0.05), 0 8px 12px -3px rgba(0, 0, 0, 0.1);
+        transform: translateX(0);
+        transition: transform 120ms ease;
+      }
+      .toggle-input:checked + .toggle-switch {
+        background: #18181b;
+        border-color: #18181b;
+      }
+      .toggle-input:checked + .toggle-switch::after {
+        transform: translateX(12px);
+        background: #ffffff;
+      }
+      .toggle-input:focus-visible + .toggle-switch {
+        outline: 2px solid #1e1e1e;
+        outline-offset: 2px;
+      }
+      .toggle-label {
+        font-weight: 500;
+        color: #18181b;
       }
       .filter-option input {
         appearance: none;
@@ -265,13 +328,14 @@
         background: #000000;
         color: #f5f5f5;
         border-radius: 8px;
-        padding: 6px 16px;
+        padding: 8px 16px;
         font-size: 12px;
         font-weight: 500;
         cursor: pointer;
-        height: 28px;
+        height: auto;
         white-space: nowrap;
         flex-shrink: 0;
+        align-self: stretch;
       }
       .apply-button:disabled {
         opacity: 0.7;
@@ -719,17 +783,24 @@
       </div>
       <div class="filter-bar">
         <div class="filter-options">
-          <label class="filter-option">
-            <input type="checkbox" id="chk-color" checked />
-            Color
-          </label>
-          <label class="filter-option">
-            <input type="checkbox" id="chk-typography" checked />
-            Typography
-          </label>
-          <label class="filter-option">
-            <input type="checkbox" id="chk-spacing" checked />
-            Spacings
+          <div class="filter-checkboxes">
+            <label class="filter-option">
+              <input type="checkbox" id="chk-color" checked />
+              Color
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" id="chk-typography" checked />
+              Typography
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" id="chk-spacing" checked />
+              Spacings
+            </label>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" id="chk-closest" class="toggle-input" checked />
+            <span class="toggle-switch" aria-hidden="true"></span>
+            <span class="toggle-label">Allow closest token match</span>
           </label>
         </div>
         <button
@@ -765,6 +836,7 @@
       const chkColor = document.getElementById("chk-color");
       const chkTypography = document.getElementById("chk-typography");
       const chkSpacing = document.getElementById("chk-spacing");
+      const chkClosest = document.getElementById("chk-closest");
       const cardEl = document.querySelector(".card");
       const listEl = document.getElementById("list");
       const darkNote = document.getElementById("dark-note");
@@ -872,38 +944,41 @@
         setLibraryError(payload.error);
       };
 
-      const formatStatusMessage = (message) => {
-        if (!message) return "";
+      const parseStatusMessage = (message) => {
+        if (!message) return { value: "", kind: "raw" };
         const normalized = String(message).trim();
         const lower = normalized.toLowerCase();
-        if (lower.includes("no matching")) {
-          return "No match";
-        }
         if (lower.includes("unsupported stroke list")) {
-          return "No match";
+          return { value: "No match", kind: "raw" };
         }
         const colonIndex = normalized.indexOf(":");
         if (colonIndex > -1) {
           const prefix = normalized.slice(0, colonIndex).toLowerCase();
+          const value = normalized.slice(colonIndex + 1).trim();
+          if (prefix.includes("nearest token")) {
+            return { value, kind: "nearest" };
+          }
           if (
+            prefix.includes("token") ||
             prefix.includes("matches variable") ||
             prefix.includes("using variable") ||
             prefix.includes("matches style") ||
             prefix.includes("using style")
           ) {
-            return normalized.slice(colonIndex + 1).trim();
+            return { value, kind: "exact" };
           }
         }
-        return normalized;
+        return { value: normalized, kind: "raw" };
       };
 
       const formatStatusLine = (label, item) => {
         if (!item) return "";
-        const value = formatStatusMessage(item.message);
-        if (item.state === "missing" && value) {
-          return `${label}: ${value} (token found)`;
+        const parsed = parseStatusMessage(item.message);
+        if (item.state === "missing" && parsed.value) {
+          const suffix = parsed.kind === "nearest" ? " (nearest token found)" : " (token found)";
+          return `${label}: ${parsed.value}${suffix}`;
         }
-        return `${label}: ${value}`;
+        return `${label}: ${parsed.value}`;
       };
 
       const getStatusColor = (state) => {
@@ -1057,6 +1132,7 @@
                   nodeId: id,
                   mode: getMode(),
                   libraryId: getLibraryId(),
+                  allowClosestMatch: chkClosest?.checked === true,
                 },
               },
               "*"
@@ -1078,6 +1154,7 @@
                   target,
                   mode: getMode(),
                   libraryId: getLibraryId(),
+                  allowClosestMatch: chkClosest?.checked === true,
                 },
               },
               "*"
@@ -1189,7 +1266,14 @@
           statusSpinnerEl.classList.remove("is-hidden");
         }
         parent.postMessage(
-          { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
+          {
+            pluginMessage: {
+              type: "refresh",
+              mode: getMode(),
+              libraryId: getLibraryId(),
+              allowClosestMatch: chkClosest?.checked === true,
+            },
+          },
           "*"
         );
       });
@@ -1199,7 +1283,14 @@
         setLoadingState(true);
         setStartScanLoading(true);
         parent.postMessage(
-          { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
+          {
+            pluginMessage: {
+              type: "refresh",
+              mode: getMode(),
+              libraryId: getLibraryId(),
+              allowClosestMatch: chkClosest?.checked === true,
+            },
+          },
           "*"
         );
       });
@@ -1226,6 +1317,7 @@
               strokes: chkColor?.checked !== false,
               typography: chkTypography?.checked !== false,
               spacing: chkSpacing?.checked !== false,
+              allowClosestMatch: chkClosest?.checked === true,
             },
           },
           "*"
@@ -1240,7 +1332,29 @@
         // Re-render with the current cached list; easiest is to trigger a refresh.
         suppressLoadingOnce = true;
         parent.postMessage(
-          { pluginMessage: { type: "refresh", mode: getMode(), libraryId: getLibraryId() } },
+          {
+            pluginMessage: {
+              type: "refresh",
+              mode: getMode(),
+              libraryId: getLibraryId(),
+              allowClosestMatch: chkClosest?.checked === true,
+            },
+          },
+          "*"
+        );
+      });
+
+      chkClosest?.addEventListener("change", () => {
+        suppressLoadingOnce = true;
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "refresh",
+              mode: getMode(),
+              libraryId: getLibraryId(),
+              allowClosestMatch: chkClosest?.checked === true,
+            },
+          },
           "*"
         );
       });
@@ -1253,6 +1367,7 @@
               type: "set-library",
               libraryId: getLibraryId(),
               mode: getMode(),
+              allowClosestMatch: chkClosest?.checked === true,
             },
           },
           "*"

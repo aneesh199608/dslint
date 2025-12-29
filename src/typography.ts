@@ -9,6 +9,14 @@ type TypographyValue = {
   letterSpacing?: { unit: "PIXELS" | "PERCENT"; value: number };
 };
 
+export const TYPOGRAPHY_MATCH_THRESHOLDS = {
+  fontSizePx: 1,
+  lineHeightPx: 2,
+  lineHeightPercent: 1,
+  letterSpacingPx: 0.2,
+  letterSpacingPercent: 0.5,
+};
+
 const isTextNode = (node: SceneNode): node is TextNode => node.type === "TEXT";
 
 const nearlyEqual = (a?: number, b?: number) => Math.abs((a ?? 0) - (b ?? 0)) < 0.0001;
@@ -48,6 +56,36 @@ const typographyEqual = (a: TypographyValue, b: TypographyValue) => {
     lhEqual &&
     lsEqual
   );
+};
+
+const getLineHeightDiff = (a?: TypographyValue["lineHeight"], b?: TypographyValue["lineHeight"]) => {
+  const lhA = a ?? { unit: "AUTO" as const };
+  const lhB = b ?? { unit: "AUTO" as const };
+  if (lhA.unit !== lhB.unit) return null;
+  if (lhA.unit === "AUTO") {
+    return { diff: 0, threshold: TYPOGRAPHY_MATCH_THRESHOLDS.lineHeightPx, unit: lhA.unit };
+  }
+  const diff = Math.abs((lhA.value ?? 0) - (lhB.value ?? 0));
+  const threshold =
+    lhA.unit === "PERCENT"
+      ? TYPOGRAPHY_MATCH_THRESHOLDS.lineHeightPercent
+      : TYPOGRAPHY_MATCH_THRESHOLDS.lineHeightPx;
+  return { diff, threshold, unit: lhA.unit };
+};
+
+const getLetterSpacingDiff = (
+  a?: TypographyValue["letterSpacing"],
+  b?: TypographyValue["letterSpacing"]
+) => {
+  const lsA = a ?? { unit: "PERCENT" as const, value: 0 };
+  const lsB = b ?? { unit: "PERCENT" as const, value: 0 };
+  if (lsA.unit !== lsB.unit) return null;
+  const diff = Math.abs((lsA.value ?? 0) - (lsB.value ?? 0));
+  const threshold =
+    lsA.unit === "PERCENT"
+      ? TYPOGRAPHY_MATCH_THRESHOLDS.letterSpacingPercent
+      : TYPOGRAPHY_MATCH_THRESHOLDS.letterSpacingPx;
+  return { diff, threshold, unit: lsA.unit };
 };
 
 const getTypographyForRange = (node: TextNode, start: number, end: number) => {
@@ -152,6 +190,82 @@ export const findMatchingTypographyVariable = async (
   }
 
   return null;
+};
+
+export const findClosestTypographyVariable = async (
+  node: SceneNode,
+  _preferredModeName: ModePreference,
+  _libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope,
+  override?: TypographyValue
+) => {
+  if (!isTextNode(node)) return null;
+
+  const nodeTypos = override ?? getNodeTypography(node).value;
+  if (!nodeTypos) return null;
+
+  const styles = await figma.getLocalTextStylesAsync();
+  let best:
+    | {
+        variable: TextStyle;
+        value: TypographyValue;
+        score: number;
+        diffs: {
+          fontSize: number;
+          lineHeight: number;
+          letterSpacing: number;
+          lineHeightUnit: "PIXELS" | "PERCENT" | "AUTO";
+          letterSpacingUnit: "PIXELS" | "PERCENT";
+        };
+      }
+    | null = null;
+
+  for (const style of styles) {
+    const styleValue: TypographyValue = {
+      fontFamily: style.fontName.family,
+      fontStyle: style.fontName.style,
+      fontSize: style.fontSize,
+      lineHeight: normalizeLineHeight(style.lineHeight as LineHeight | undefined),
+      letterSpacing: normalizeLetterSpacing(style.letterSpacing as LetterSpacing | undefined),
+    };
+
+    if (styleValue.fontFamily !== nodeTypos.fontFamily || styleValue.fontStyle !== nodeTypos.fontStyle) {
+      continue;
+    }
+
+    const fontSizeDiff = Math.abs((styleValue.fontSize ?? 0) - (nodeTypos.fontSize ?? 0));
+    if (fontSizeDiff > TYPOGRAPHY_MATCH_THRESHOLDS.fontSizePx) continue;
+
+    const lineHeight = getLineHeightDiff(styleValue.lineHeight, nodeTypos.lineHeight);
+    if (!lineHeight || lineHeight.diff > lineHeight.threshold) continue;
+
+    const letterSpacing = getLetterSpacingDiff(
+      styleValue.letterSpacing,
+      nodeTypos.letterSpacing
+    );
+    if (!letterSpacing || letterSpacing.diff > letterSpacing.threshold) continue;
+
+    const score =
+      fontSizeDiff / TYPOGRAPHY_MATCH_THRESHOLDS.fontSizePx +
+      lineHeight.diff / lineHeight.threshold +
+      letterSpacing.diff / letterSpacing.threshold;
+
+    if (!best || score < best.score) {
+      best = {
+        variable: style,
+        value: styleValue,
+        score,
+        diffs: {
+          fontSize: fontSizeDiff,
+          lineHeight: lineHeight.diff,
+          letterSpacing: letterSpacing.diff,
+          lineHeightUnit: lineHeight.unit,
+          letterSpacingUnit: letterSpacing.unit,
+        },
+      };
+    }
+  }
+
+  return best;
 };
 
 export const findNumericVariableMatch = async (

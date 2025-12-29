@@ -23,6 +23,10 @@ export type StatusPayload = {
   state?: StatusState;
 };
 
+export type MatchSettings = {
+  allowClosestMatch?: boolean;
+};
+
 export type PaintInfo = {
   kind: "fill" | "stroke";
   message: string;

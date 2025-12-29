@@ -20,7 +20,7 @@ const resolveNumericValue = async (variable: Variable) => {
 };
 
 const EPSILON = 1e-5;
-export const DEFAULT_SPACING_TOLERANCE = 2;
+export const DEFAULT_SPACING_TOLERANCE = 1;
 
 export const findSpacingVariable = async (
   value: number,
@@ -42,14 +42,18 @@ export const findNearestSpacingVariable = async (
   libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const vars = await getVariablesForScope("FLOAT", libraryScope);
-  let best: { variable: Variable; diff: number } | null = null;
+  let best: { variable: Variable; diff: number; value: number } | null = null;
 
   for (const variable of vars) {
     const resolved = await resolveNumericValue(variable);
     if (resolved === null) continue;
     const diff = Math.abs(resolved - value);
-    if (best === null || diff < best.diff) {
-      best = { variable, diff };
+    if (
+      best === null ||
+      diff < best.diff ||
+      (diff === best.diff && resolved > best.value)
+    ) {
+      best = { variable, diff, value: resolved };
     }
   }
 

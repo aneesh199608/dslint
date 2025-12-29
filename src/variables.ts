@@ -2,6 +2,11 @@ import { colorsEqual, type RGBA } from "./colors";
 import type { LibraryScope, ModePreference } from "./types";
 import { getVariablesForScope, LOCAL_LIBRARY_OPTION } from "./libraries";
 
+export const COLOR_MATCH_THRESHOLDS = {
+  maxChannelDelta: 8 / 255,
+  alphaDelta: 0.1,
+};
+
 const pickModeId = (
   collection: VariableCollection,
   preferredModeName: ModePreference
@@ -94,4 +99,62 @@ export const findNearestColorVariable = async (
   }
 
   return null;
+};
+
+export const findClosestColorVariable = async (
+  color: RGB,
+  opacity: number,
+  preferredModeName: ModePreference,
+  libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
+) => {
+  const paintAlpha = Math.min(1, Math.max(0, opacity ?? 1));
+  const variables = await getVariablesForScope("COLOR", libraryScope);
+  let best: {
+    variable: Variable;
+    distance: number;
+    maxChannelDelta: number;
+    alphaDelta: number;
+    isMulti: boolean;
+  } | null = null;
+
+  for (const variable of variables) {
+    const collection = await figma.variables.getVariableCollectionByIdAsync(
+      variable.variableCollectionId
+    );
+    if (!collection) continue;
+
+    const variableColor = await resolveColorForMode(variable, preferredModeName);
+    if (!variableColor) continue;
+
+    const variableAlpha = variableColor.a ?? 1;
+    const alphaDelta = Math.abs(variableAlpha - paintAlpha);
+    const channelDeltas = {
+      r: Math.abs(variableColor.r * variableAlpha - color.r * paintAlpha),
+      g: Math.abs(variableColor.g * variableAlpha - color.g * paintAlpha),
+      b: Math.abs(variableColor.b * variableAlpha - color.b * paintAlpha),
+    };
+    const maxChannelDelta = Math.max(channelDeltas.r, channelDeltas.g, channelDeltas.b);
+    const distance =
+      channelDeltas.r * channelDeltas.r +
+      channelDeltas.g * channelDeltas.g +
+      channelDeltas.b * channelDeltas.b;
+
+    if (
+      maxChannelDelta > COLOR_MATCH_THRESHOLDS.maxChannelDelta ||
+      alphaDelta > COLOR_MATCH_THRESHOLDS.alphaDelta
+    ) {
+      continue;
+    }
+
+    const isMultiMode = collection.modes.length > 1;
+    if (
+      !best ||
+      distance < best.distance ||
+      (distance === best.distance && isMultiMode && !best.isMulti)
+    ) {
+      best = { variable, distance, maxChannelDelta, alphaDelta, isMulti: isMultiMode };
+    }
+  }
+
+  return best;
 };

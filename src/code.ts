@@ -11,7 +11,7 @@ import {
 } from "./apply";
 import { highlightNode, restoreSelection } from "./highlight";
 import { fetchLibraryOptions, LOCAL_LIBRARY_OPTION, resolveScopeFromId, runLibraryDiagnostics } from "./libraries";
-import type { LibraryOption, LibraryScope, ModePreference } from "./types";
+import type { LibraryOption, LibraryScope, MatchSettings, ModePreference } from "./types";
 
 const MIN_WIDTH = 480;
 const MIN_HEIGHT = 720;
@@ -101,9 +101,13 @@ const setLibrarySelection = async (libraryId?: string, persist?: boolean): Promi
   return currentLibrary.scope;
 };
 
-const handleScan = async (mode?: ModePreference, libraryId?: string) => {
+const handleScan = async (
+  mode?: ModePreference,
+  libraryId?: string,
+  settings?: MatchSettings
+) => {
   const scope = await setLibrarySelection(libraryId, libraryId !== undefined);
-  await scanSelection(getMode(mode), scope);
+  await scanSelection(getMode(mode), scope, settings);
 };
 
 handleScan(DEFAULT_MODE).catch((err) => console.error("Initial scan failed", err));
@@ -118,13 +122,17 @@ figma.ui.onmessage = async (msg) => {
   }
 
   if (msg?.type === "refresh") {
-    await handleScan(msg.mode, msg.libraryId);
+    await handleScan(msg.mode, msg.libraryId, {
+      allowClosestMatch: msg.allowClosestMatch,
+    });
     return;
   }
 
   if (msg?.type === "set-library") {
     await setLibrarySelection(msg.libraryId, true);
-    await handleScan(msg.mode ?? DEFAULT_MODE, msg.libraryId);
+    await handleScan(msg.mode ?? DEFAULT_MODE, msg.libraryId, {
+      allowClosestMatch: msg.allowClosestMatch,
+    });
     return;
   }
 
@@ -132,26 +140,28 @@ figma.ui.onmessage = async (msg) => {
   if (msg?.type === "apply-token") {
     try {
       const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
+      const settings = { allowClosestMatch: msg.allowClosestMatch };
       if (msg.target === "typography") {
-        await applyTypographyToNode(msg.nodeId, getMode(msg.mode), scope);
+        await applyTypographyToNode(msg.nodeId, getMode(msg.mode), scope, settings);
       } else if (msg.target === "padding") {
-        await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode), scope);
+        await applyPaddingTokenToNode(msg.nodeId, getMode(msg.mode), scope, settings);
       } else if (msg.target === "gap") {
-        await applyGapTokenToNode(msg.nodeId, getMode(msg.mode), scope);
+        await applyGapTokenToNode(msg.nodeId, getMode(msg.mode), scope, settings);
       // Stroke weight tokenization disabled for this iteration.
       // } else if (msg.target === "strokeWeight") {
       //   await applyStrokeWeightTokenToNode(msg.nodeId, getMode(msg.mode), scope);
       } else if (msg.target === "cornerRadius") {
-        await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode), scope);
+        await applyCornerRadiusTokenToNode(msg.nodeId, getMode(msg.mode), scope, settings);
       } else {
         await applyNearestTokenToNode(
           msg.nodeId,
           getMode(msg.mode),
           msg.target ?? "fill",
-          scope
+          scope,
+          settings
         );
       }
-      await handleScan(msg.mode, msg.libraryId);
+      await handleScan(msg.mode, msg.libraryId, settings);
     } catch (error) {
       sendStatus({
         title: "Apply failed",
@@ -166,8 +176,9 @@ figma.ui.onmessage = async (msg) => {
   if (msg?.type === "apply-token-layer") {
     try {
       const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
-      await applyAllMissingForNode(msg.nodeId, getMode(msg.mode), scope);
-      await handleScan(msg.mode, msg.libraryId);
+      const settings = { allowClosestMatch: msg.allowClosestMatch };
+      await applyAllMissingForNode(msg.nodeId, getMode(msg.mode), scope, settings);
+      await handleScan(msg.mode, msg.libraryId, settings);
     } catch (error) {
       sendStatus({
         title: "Apply failed",
@@ -184,13 +195,14 @@ figma.ui.onmessage = async (msg) => {
       const scope = await setLibrarySelection(msg.libraryId, msg.libraryId !== undefined);
       const spacingFlag =
         msg.spacing !== undefined ? msg.spacing !== false : msg.padding !== false;
+      const settings = { allowClosestMatch: msg.allowClosestMatch };
       await applyAllMissing(getMode(msg.mode), scope, {
         fills: msg.fills !== false,
         strokes: msg.strokes !== false,
         spacing: spacingFlag,
         typography: msg.typography !== false,
-      });
-      await handleScan(msg.mode, msg.libraryId);
+      }, settings);
+      await handleScan(msg.mode, msg.libraryId, settings);
     } catch (error) {
       sendStatus({
         title: "Apply failed",

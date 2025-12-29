@@ -1,12 +1,17 @@
 import { rgbToHex } from "./colors";
 import { sendStatus } from "./messages";
 import { gatherNodesWithPaints } from "./selection";
-import { findMatchingTypographyVariable, getTypography } from "./typography";
-import { findSpacingVariable } from "./spacing";
+import { findClosestTypographyVariable, findMatchingTypographyVariable, getTypography } from "./typography";
+import {
+  DEFAULT_SPACING_TOLERANCE,
+  findNearestSpacingVariable,
+  findSpacingVariable,
+} from "./spacing";
 import { setOriginalSelection } from "./highlight";
-import { findNearestColorVariable } from "./variables";
+import { COLOR_MATCH_THRESHOLDS, findClosestColorVariable, findNearestColorVariable } from "./variables";
 import type {
   LibraryScope,
+  MatchSettings,
   ModePreference,
   NodeScanResult,
   PaintInfo,
@@ -20,11 +25,31 @@ import type {
 
 const isZero = (value: number | null | undefined) => Math.abs(value ?? 0) < 0.000001;
 
+const resolveSpacingMatch = async (
+  value: number,
+  libraryScope: LibraryScope,
+  allowClosestMatch: boolean
+) => {
+  const exact = await findSpacingVariable(value, libraryScope);
+  if (exact) {
+    return { variable: exact, diff: 0, isClosest: false };
+  }
+  if (!allowClosestMatch) return null;
+  const nearest = await findNearestSpacingVariable(
+    value,
+    DEFAULT_SPACING_TOLERANCE,
+    libraryScope
+  );
+  if (!nearest) return null;
+  return { variable: nearest.variable, diff: nearest.diff, isClosest: true };
+};
+
 const evalPaint = async (
   node: SceneNode,
   kind: "fill" | "stroke",
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope
+  libraryScope: LibraryScope,
+  allowClosestMatch: boolean
 ): Promise<PaintInfo | null> => {
   const paints = kind === "fill" ? (node as GeometryMixin).fills : (node as GeometryMixin).strokes;
   if (!Array.isArray(paints) || paints.length === 0) {
@@ -110,16 +135,36 @@ const evalPaint = async (
   if (match) {
     return {
       kind,
-      message: `Matches variable: ${match.name}${opacityDisplay}`,
+      message: `Token: ${match.name}${opacityDisplay}`,
       state: "missing",
       variableName: match.name,
       hex,
     };
   }
 
+  if (allowClosestMatch) {
+    const closest = await findClosestColorVariable(
+      first.color,
+      opacity,
+      preferredModeName,
+      libraryScope
+    );
+    if (closest) {
+      return {
+        kind,
+        message: `Nearest token: ${closest.variable.name}${opacityDisplay}`,
+        state: "missing",
+        variableName: closest.variable.name,
+        hex,
+      };
+    }
+  }
+
   return {
     kind,
-      message: `${kind === "fill" ? "Fill" : "Stroke"} color: ${hex}${opacityDisplay} is not using a variable (no exact token match).`,
+      message: `${hex}${opacityDisplay} is not using a variable (${
+        allowClosestMatch ? "no exact or nearest token match" : "no exact token match"
+      }).`,
     state: "info",
     hex,
   };
@@ -152,7 +197,8 @@ const computeOverallState = (
 
 export const scanSelection = async (
   preferredModeName: ModePreference,
-  libraryScope: LibraryScope
+  libraryScope: LibraryScope,
+  settings?: MatchSettings
 ): Promise<NodeScanResult[]> => {
   const selection = figma.currentPage.selection;
   setOriginalSelection(selection);
@@ -177,11 +223,12 @@ export const scanSelection = async (
   });
 
   const nodes = gatherNodesWithPaints(selection);
+  const allowClosestMatch = Boolean(settings?.allowClosestMatch);
   const results: NodeScanResult[] = [];
 
   for (const node of nodes) {
-    const fill = await evalPaint(node, "fill", preferredModeName, libraryScope);
-    const stroke = await evalPaint(node, "stroke", preferredModeName, libraryScope);
+    const fill = await evalPaint(node, "fill", preferredModeName, libraryScope, allowClosestMatch);
+    const stroke = await evalPaint(node, "stroke", preferredModeName, libraryScope, allowClosestMatch);
     let typography: TypographyInfo | undefined;
     let padding: PaddingInfo | undefined;
     let gap: GapInfo | undefined;
@@ -224,14 +271,34 @@ export const scanSelection = async (
         );
         if (match) {
           typography = {
-            message: `Matches style: ${match.variable.name}`,
+            message: `Token: ${match.variable.name}`,
             state: "missing",
             variableName: match.variable.name,
             styleId: match.variable.id,
           };
+        } else if (allowClosestMatch) {
+          const closest = await findClosestTypographyVariable(
+            node,
+            preferredModeName,
+            libraryScope,
+            typoInfo.value
+          );
+          if (closest) {
+            typography = {
+              message: `Nearest token: ${closest.variable.name}`,
+              state: "missing",
+              variableName: closest.variable.name,
+              styleId: closest.variable.id,
+            };
+          } else {
+            typography = {
+              message: `Typography is not using a variable (${allowClosestMatch ? "no exact or nearest token match" : "no exact token match"}).`,
+              state: "info",
+            };
+          }
         } else {
           typography = {
-            message: "Typography has no matching token",
+            message: `Typography is not using a variable (${allowClosestMatch ? "no exact or nearest token match" : "no exact token match"}).`,
             state: "info",
           };
         }
@@ -274,21 +341,27 @@ export const scanSelection = async (
           const matches = await Promise.all(
             relevant.map(async (s) => ({
               ...s,
-              match: await findSpacingVariable(s.value, libraryScope),
+              match: await resolveSpacingMatch(s.value, libraryScope, allowClosestMatch),
             }))
           );
           const unmatched = matches.filter((m) => !m.match);
           if (unmatched.length) {
+            const values = relevant.map((s) => `${s.label}:${s.value}`).join(" ");
             padding = {
-              message: "Padding has no matching token",
+              message: `${values} is not using a variable (${
+                allowClosestMatch ? "no exact or nearest token match" : "no exact token match"
+              }).`,
               state: "info",
             };
           } else {
-            const parts = matches.map((m) => `${m.label}:${m.match!.name}`).join(" ");
+            const hasNearest = matches.some((m) => m.match?.isClosest);
+            const parts = matches
+              .map((m) => `${m.label}:${m.match!.variable.name}`)
+              .join(" ");
             padding = {
-              message: parts,
+              message: `${hasNearest ? "Nearest token" : "Token"}: ${parts}`,
               state: "missing",
-              variableName: matches.map((m) => m.match!.name).join(" / "),
+              variableName: matches.map((m) => m.match!.variable.name).join(" / "),
             };
           }
         }
@@ -324,15 +397,20 @@ export const scanSelection = async (
               variableName: variable?.name,
             };
           } else {
-            const match = await findSpacingVariable(spacing, libraryScope);
+            const match = await resolveSpacingMatch(spacing, libraryScope, allowClosestMatch);
             if (match) {
               gap = {
-                message: match.name,
+                message: `${match.isClosest ? "Nearest token" : "Token"}: ${match.variable.name}`,
                 state: "missing",
-                variableName: match.name,
+                variableName: match.variable.name,
               };
             } else {
-              gap = { message: "Gap has no matching token", state: "info" };
+              gap = {
+                message: `${spacing} is not using a variable (${
+                  allowClosestMatch ? "no exact or nearest token match" : "no exact token match"
+                }).`,
+                state: "info",
+              };
             }
           }
         }
@@ -468,16 +546,18 @@ export const scanSelection = async (
           if (boundId) {
             await setFound(boundId);
           } else {
-            const match = await findSpacingVariable(radius, libraryScope);
+            const match = await resolveSpacingMatch(radius, libraryScope, allowClosestMatch);
             if (match) {
               cornerRadius = {
-                message: match.name,
+                message: `${match.isClosest ? "Nearest token" : "Token"}: ${match.variable.name}`,
                 state: "missing",
-                variableName: match.name,
+                variableName: match.variable.name,
               };
             } else {
               cornerRadius = {
-                message: "Corner radius has no matching token",
+                message: `${radius} is not using a variable (${
+                  allowClosestMatch ? "no exact or nearest token match" : "no exact token match"
+                }).`,
                 state: "info",
               };
             }
@@ -501,28 +581,37 @@ export const scanSelection = async (
             const matches = await Promise.all(
               corners.map(async (c) => ({
                 ...c,
-                match: c.bound ? null : await findSpacingVariable(c.value as number, libraryScope),
+                match: c.bound
+                  ? null
+                  : await resolveSpacingMatch(c.value as number, libraryScope, allowClosestMatch),
               }))
             );
             const matched = matches.filter((m) => m.match);
             if (!matched.length) {
               cornerRadius = {
-                message: "Corner radius has no matching token",
+                message: `${corners
+                  .map((c) => `${c.label}:${c.value}`)
+                  .join(" ")} is not using a variable (${
+                  allowClosestMatch ? "no exact or nearest token match" : "no exact token match"
+                }).`,
                 state: "info",
               };
             } else {
+              const hasNearest = matches.some((m) => m.match?.isClosest);
               const parts = matches
                 .map((m) => {
                   if (m.bound) return `${m.label}:bound`;
-                  if (m.match) return `${m.label}:${m.match.name}`;
+                  if (m.match) {
+                    return `${m.label}:${m.match.variable.name}`;
+                  }
                   return `${m.label}:?`;
                 })
                 .join(" ");
               cornerRadius = {
-                message: parts,
+                message: `${hasNearest ? "Nearest token" : "Token"}: ${parts}`,
                 state: "missing",
                 variableName: matches
-                  .map((m) => (m.match ? m.match.name : ""))
+                  .map((m) => (m.match ? m.match.variable.name : ""))
                   .filter(Boolean)
                   .join(" / "),
               };
