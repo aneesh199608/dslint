@@ -36,7 +36,7 @@
 - **US2 (P1)**: As a user, the closest match logic applies to spacings and typography with similar strict thresholds.
   - Acceptance:
     - Spacing matches only if within tolerance; choose higher value when equidistant (e.g., 5 with tokens 4 and 6 -> 6).
-    - Typography matches only if font family/style match exactly and numeric differences are within threshold.
+    - Typography matches only if font family/style match exactly and font size is within threshold; line height/letter spacing do not block a match.
 - **US3 (P2)**: As a user, I can see why a closest match is suggested (delta/threshold in message).
 - **Edge Cases**: Mixed fills/typography; Auto spacing; missing fonts; zero values; low-opacity colors; multi-mode variables.
 
@@ -64,12 +64,9 @@
   - Tie-break: if two tokens are equally distant, choose the higher value (e.g., `4, 6` with `5` chooses `6`).
   - Example: `5` -> `6` passes; `3` -> `6` fails; `3` -> `4` passes (within 1).
 - **Typography** (styles):
-  - Only consider styles with exact font family + font style match.
-  - Accept if:
-    - `fontSizeDiff <= 1px`,
-    - `lineHeightDiff <= 2px` (or same unit when percent),
-    - `letterSpacingDiff <= 0.2px` (or same unit when percent).
-  - Ranking: sum of normalized diffs; lowest wins.
+  - Only consider styles with exact font family + font style match (italic vs regular never match).
+  - Accept if: `fontSizeDiff <= 1px`.
+  - Ranking: smallest `fontSizeDiff`; if tie, deterministic name/ID tie-break.
 
 ### Success Criteria
 - **SC-001**: Toggling off yields identical results to current behavior.

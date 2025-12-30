@@ -940,7 +940,7 @@ export const applyTypographyToNode = async (
     sendStatus({
       title: "Typography token applied",
       message: `Applied typography style: ${resolvedMatch.variable.name}${
-        closest ? " (nearest match)" : ""
+        closest ? " (nearest size match)" : ""
       }`,
       state: "applied",
     });

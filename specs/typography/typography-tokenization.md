@@ -9,7 +9,7 @@
 
 - **User Prompt / Goal**: Typography tokenization should find matching tokens/text styles and let the plugin apply them (per-row and bulk) instead of only showing “coming soon”.
 - **Scope**: Selection scanning on the current page (same as other token flows).
-- **Critical Constraints**: Figma runtime lacks typography variable support; current logic falls back to exact text-style matches; only uniform text (no mixed fonts/sizes/line heights) is processed; letter spacing/paragraph spacing ignored.
+- **Critical Constraints**: Figma runtime lacks typography variable support; current logic falls back to exact text-style matches; only uniform text (no mixed fonts/sizes/line heights) is processed; exact match includes line height + letter spacing, while closest match (when enabled) ignores them.
 - **Tech Stack**: TypeScript, Figma Plugin runtime, typography resolver in `src/typography.ts`, UI in `src/ui.html`/`src/code.ts`.
 - **Similar Feature to Mirror**: Color/padding/stroke weight token apply flows (scan + per-row apply + bulk).
 
@@ -24,7 +24,7 @@
 
 ## Current Findings
 
-- Detection works only for uniform text nodes without missing fonts; compares `fontFamily`, `fontStyle`, `fontSize`, and normalized `lineHeight` (unit + value). Letter spacing and paragraph spacing are ignored, so matches may be false positives/negatives.
+- Detection works only for uniform text nodes without missing fonts; compares `fontFamily`, `fontStyle`, `fontSize`, normalized `lineHeight` (unit + value), and `letterSpacing`. Paragraph spacing is still ignored.
 - Matching is against local text styles because typography variables are not supported in this environment; exact equality required (no tolerance except strict equality on numbers and line-height units/values).
 - When a text node is already bound to a text style (`textStyleId`), the scan reports it as “Using typography style: <name>” (state `info`).
 - When an exact style match is found, the scan reports “Typography: matches <style> (coming soon)” (state `info`).
@@ -47,7 +47,8 @@
 
 ### Functional Requirements
 - **FR-001**: Include typography in scan results with state `found/missing/info/error` consistent with other token types.
-- **FR-002**: Exact-match resolver compares font family/style, font size, and line height; tolerate AUTO vs numeric correctly; document handling for letter/paragraph spacing (ignore or include).
+- **FR-002**: Exact-match resolver compares font family/style, font size, line height, and letter spacing; tolerate AUTO vs numeric correctly; document paragraph spacing handling (ignored).
+- **FR-006**: Closest-match resolver (when enabled) requires exact font family + font style/weight (italic vs regular never match), and allows small font size differences; line height/letter spacing do not block a closest match.
 - **FR-003**: Enable per-row typography apply button when a match exists and the node is not already bound; disable otherwise.
 - **FR-004**: Implement apply path that sets `textStyleId` to the matched style (or typography variable when supported) and re-runs scan for refreshed status.
 - **FR-005**: Bulk apply includes typography when enabled and only acts on nodes marked missing with a resolvable match; avoid mutating nodes without matches or with mixed styles.

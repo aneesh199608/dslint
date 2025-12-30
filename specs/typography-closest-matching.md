@@ -34,18 +34,18 @@
     - Given closest match enabled, a text node at size 15 matches a style at size 16 when family+weight match.
     - Given closest match enabled, a text node with mismatched line height/letter spacing still matches if family+weight+size are close.
 - **US2 (P2)**: As a user, exact matches remain unchanged and still require full property equality.
-- **US3 (P2)**: As a user, closest matches remain deterministic and do not apply if family/weight do not match.
+- **US3 (P2)**: As a user, closest matches remain deterministic and do not apply if family/weight/style do not match (italic vs regular is never interchangeable).
 - **Edge Cases**: Mixed typography; missing fonts; font style naming variations; italic vs regular; multiple styles at the same size.
 
 ### Functional Requirements
 - **FR-001**: Exact-match logic remains unchanged (family, style/weight, size, line height, letter spacing).
-- **FR-002**: Closest-match logic uses strict font family + font style/weight equality and a size tolerance; line height and letter spacing do not block a match.
+- **FR-002**: Closest-match logic uses strict font family + font style/weight equality (italic vs regular never match) and a size tolerance; line height and letter spacing do not block a match.
 - **FR-003**: Closest-match selection is deterministic: choose the smallest font size delta; tie-break by alphabetic style name or ID if needed.
 - **FR-004**: UI/scan messaging indicates closest match when a near match is used.
 - **FR-005**: Apply uses the same closest-match logic as scan to avoid mismatches.
 
 ### Closest-Match Logic (proposal)
-- **Candidate filter**: `fontFamily === node.fontFamily` and `fontStyle === node.fontStyle`.
+- **Candidate filter**: `fontFamily === node.fontFamily` and `fontStyle === node.fontStyle` (italic vs regular excluded).
 - **Accept**: `abs(style.fontSize - node.fontSize) <= 1px` (configurable threshold).
 - **Score**: `abs(fontSizeDiff)` only; ignore line height/letter spacing.
 - **Tie-break**: Lower fontSizeDiff; if equal, prefer style name lexicographically to avoid randomness.
@@ -54,7 +54,7 @@
 ### Success Criteria
 - **SC-001**: Closest matches appear for near font sizes even with line height/letter spacing differences.
 - **SC-002**: Exact matches behave exactly as before with no regression.
-- **SC-003**: No closest match is returned when family or weight/style differs.
+- **SC-003**: No closest match is returned when family or weight/style differs (including italic vs regular).
 - **SC-004**: Scan/apply use identical logic and results are deterministic.
 
 ## Plan Draft (implementation outline)
@@ -87,9 +87,9 @@
 
 ## Open Questions (fill before build)
 
-- Should font size tolerance stay at 1px, or should it be configurable?  
-- Should line height/letter spacing be used as a secondary tie-breaker when font sizes are equally close, or ignored entirely?
-- How should italic vs regular be treated if they share the same family but different style names?
+- Should font size tolerance stay at 1px, or should it be configurable? - lets keep tolerance at 1px
+- Should line height/letter spacing be used as a secondary tie-breaker when font sizes are equally close, or ignored entirely? - yes, take a call
+- Italic vs regular: exact style match only; no fallback across style names.
 
 ---
 

@@ -209,13 +209,8 @@ export const findClosestTypographyVariable = async (
         variable: TextStyle;
         value: TypographyValue;
         score: number;
-        diffs: {
-          fontSize: number;
-          lineHeight: number;
-          letterSpacing: number;
-          lineHeightUnit: "PIXELS" | "PERCENT" | "AUTO";
-          letterSpacingUnit: "PIXELS" | "PERCENT";
-        };
+        tieBreakKey: string;
+        fontSizeDiff: number;
       }
     | null = null;
 
@@ -235,32 +230,19 @@ export const findClosestTypographyVariable = async (
     const fontSizeDiff = Math.abs((styleValue.fontSize ?? 0) - (nodeTypos.fontSize ?? 0));
     if (fontSizeDiff > TYPOGRAPHY_MATCH_THRESHOLDS.fontSizePx) continue;
 
-    const lineHeight = getLineHeightDiff(styleValue.lineHeight, nodeTypos.lineHeight);
-    if (!lineHeight || lineHeight.diff > lineHeight.threshold) continue;
-
-    const letterSpacing = getLetterSpacingDiff(
-      styleValue.letterSpacing,
-      nodeTypos.letterSpacing
-    );
-    if (!letterSpacing || letterSpacing.diff > letterSpacing.threshold) continue;
-
-    const score =
-      fontSizeDiff / TYPOGRAPHY_MATCH_THRESHOLDS.fontSizePx +
-      lineHeight.diff / lineHeight.threshold +
-      letterSpacing.diff / letterSpacing.threshold;
-
-    if (!best || score < best.score) {
+    const score = fontSizeDiff / TYPOGRAPHY_MATCH_THRESHOLDS.fontSizePx;
+    const tieBreakKey = `${style.name}::${style.id}`;
+    if (
+      !best ||
+      score < best.score ||
+      (nearlyEqual(score, best.score) && tieBreakKey.localeCompare(best.tieBreakKey) < 0)
+    ) {
       best = {
         variable: style,
         value: styleValue,
         score,
-        diffs: {
-          fontSize: fontSizeDiff,
-          lineHeight: lineHeight.diff,
-          letterSpacing: letterSpacing.diff,
-          lineHeightUnit: lineHeight.unit,
-          letterSpacingUnit: letterSpacing.unit,
-        },
+        tieBreakKey,
+        fontSizeDiff,
       };
     }
   }

@@ -316,7 +316,7 @@ export const scanSelection = async (
           );
           if (closest) {
             typography = {
-              message: `Nearest token: ${closest.variable.name}`,
+              message: `Nearest token (size): ${closest.variable.name}`,
               state: "missing",
               variableName: closest.variable.name,
               styleId: closest.variable.id,

@@ -1,5 +1,9 @@
 ## About Typography from Figma docs - 
 
+## DSLint Note
+
+Closest typography matching in DSLint (when enabled) requires exact font family + font style/weight (italic vs regular never match). Font size is allowed a small tolerance; line height and letter spacing do not block a closest match.
+
 Styles allows you to define a set of properties that can be reused across your team or organizations's files and projects. Use text styles to define typographic scale within your designs.
 
 You can apply a text style to an entire text layer or a range of text within a layer. For example: you can apply header text to an entire text layer, or style a text string within a paragraph as a link.
