@@ -27,13 +27,20 @@ export const findSpacingVariable = async (
   libraryScope: LibraryScope = LOCAL_LIBRARY_OPTION.scope
 ) => {
   const vars = await getVariablesForScope("FLOAT", libraryScope);
+  let best: Variable | null = null;
+  let bestScore = -1;
   for (const variable of vars) {
     const resolved = await resolveNumericValue(variable);
     if (resolved !== null && Math.abs(resolved - value) < EPSILON) {
-      return variable;
+      const lower = variable.name.toLowerCase();
+      const score = lower.includes("padding") ? 2 : lower.includes("spacing") ? 1 : 0;
+      if (score > bestScore) {
+        best = variable;
+        bestScore = score;
+      }
     }
   }
-  return null;
+  return best;
 };
 
 export const findNearestSpacingVariable = async (

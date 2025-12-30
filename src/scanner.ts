@@ -24,6 +24,37 @@ import type {
 } from "./types";
 
 const isZero = (value: number | null | undefined) => Math.abs(value ?? 0) < 0.000001;
+const getBoundVariableId = (binding: unknown): string | null => {
+  if (!binding) return null;
+  if (typeof binding === "string") return binding;
+  if (typeof binding === "object" && "id" in (binding as { id?: string })) {
+    return (binding as { id?: string }).id ?? null;
+  }
+  return null;
+};
+
+const formatPaddingGroups = (
+  sides: { label: string; name: string }[],
+  collapseAllSame: boolean
+) => {
+  const groups: { name: string; labels: string[] }[] = [];
+  for (const side of sides) {
+    const existing = groups.find((g) => g.name === side.name);
+    if (existing) {
+      existing.labels.push(side.label);
+    } else {
+      groups.push({ name: side.name, labels: [side.label] });
+    }
+  }
+
+  if (collapseAllSame && groups.length === 1) {
+    return groups[0].name;
+  }
+
+  return groups
+    .map((group) => `${group.labels.join(",")}: ${group.name}`)
+    .join(", ");
+};
 
 const resolveSpacingMatch = async (
   value: number,
@@ -316,10 +347,10 @@ export const scanSelection = async (
       const pb = layoutNode.paddingBottom;
       const bound = (node as any).boundVariables;
       const sides = [
-        { value: pl, bound: bound?.paddingLeft?.id, label: "L" },
-        { value: pr, bound: bound?.paddingRight?.id, label: "R" },
-        { value: pt, bound: bound?.paddingTop?.id, label: "T" },
-        { value: pb, bound: bound?.paddingBottom?.id, label: "B" },
+        { value: pl, bound: getBoundVariableId(bound?.paddingLeft), label: "L" },
+        { value: pr, bound: getBoundVariableId(bound?.paddingRight), label: "R" },
+        { value: pt, bound: getBoundVariableId(bound?.paddingTop), label: "T" },
+        { value: pb, bound: getBoundVariableId(bound?.paddingBottom), label: "B" },
       ];
       const relevant = sides.filter((s) => !isZero(s.value));
       if (!relevant.length) {
@@ -330,12 +361,39 @@ export const scanSelection = async (
           state: "info",
         };
       } else {
-        const allRelevantBound = relevant.every((s) => Boolean(s.bound));
+        const resolvedBound = await Promise.all(
+          relevant.map(async (s) => {
+            if (!s.bound) return { ...s, boundName: null };
+            const variable = await figma.variables.getVariableByIdAsync(s.bound);
+            return { ...s, boundName: variable?.name ?? "Unknown variable" };
+          })
+        );
+        const allRelevantBound = resolvedBound.every((s) => Boolean(s.bound));
+        const anyRelevantBound = resolvedBound.some((s) => Boolean(s.bound));
         if (allRelevantBound) {
+          const message = formatPaddingGroups(
+            resolvedBound.map((s) => ({ label: s.label, name: s.boundName ?? "Unknown variable" })),
+            resolvedBound.length === 4
+          );
           padding = {
-            message: "Padding bound to variable(s)",
+            message,
             state: "found",
-            variableName: relevant.map((s) => s.bound).filter(Boolean).join(", "),
+            variableName: resolvedBound
+              .map((s) => s.boundName)
+              .filter(Boolean)
+              .join(", "),
+          };
+        } else if (anyRelevantBound) {
+          const message = formatPaddingGroups(
+            resolvedBound.map((s) => ({
+              label: s.label,
+              name: s.boundName ?? "(unbound)",
+            })),
+            false
+          );
+          padding = {
+            message,
+            state: "info",
           };
         } else {
           const matches = await Promise.all(
@@ -355,9 +413,13 @@ export const scanSelection = async (
             };
           } else {
             const hasNearest = matches.some((m) => m.match?.isClosest);
-            const parts = matches
-              .map((m) => `${m.label}:${m.match!.variable.name}`)
-              .join(" ");
+            const parts = formatPaddingGroups(
+              matches.map((m) => ({
+                label: m.label,
+                name: m.match!.variable.name,
+              })),
+              matches.length === 4
+            );
             padding = {
               message: `${hasNearest ? "Nearest token" : "Token"}: ${parts}`,
               state: "missing",
